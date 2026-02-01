@@ -101,6 +101,35 @@ def test_inspect_pcap_no_flows(tmp_path: Path) -> None:
     assert not any(e.get("type") == "flow" for e in events)
 
 
+def test_inspect_pcap_event_filters(tmp_path: Path) -> None:
+    dns_pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    tls_pkt = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=443, seq=1)
+        / Raw(load=_tls_client_hello_record(sni="example.com"))
+    )
+    pcap = tmp_path / "events.pcap"
+    wrpcap(str(pcap), [dns_pkt, tls_pkt])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_flows=False,
+        include_dns=True,
+        include_http=False,
+        include_tls=False,
+    )
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert any(e.get("type") == "dns" for e in events)
+    assert not any(e.get("type") == "tls" for e in events)
+
+
 def test_summarize_pcap(tmp_path: Path) -> None:
     dns_pkt = (
         IP(src="1.1.1.1", dst="8.8.8.8")

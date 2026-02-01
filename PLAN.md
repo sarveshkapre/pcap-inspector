@@ -41,8 +41,9 @@ make typecheck
 - `summary` command to print aggregate stats (optionally JSON).
 - `--no-include-flows` option to emit events-only JSONL.
 - Event records now include `ts` (pcap packet timestamp).
+- Event filters: `--no-include-dns/--no-include-http/--no-include-tls`.
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add `--include-tls/--include-http/--include-dns` filters to reduce noise.
+- Add optional `--sort-flows` for stable flow ordering in output.

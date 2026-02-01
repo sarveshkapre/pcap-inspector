@@ -246,7 +246,16 @@ def _parse_tls_alpn_extension(ext: bytes) -> list[str]:
     return protos
 
 
-def inspect_pcap(path: Path, out_path: Path, max_packets: int, include_flows: bool = True) -> int:
+def inspect_pcap(
+    path: Path,
+    out_path: Path,
+    max_packets: int,
+    *,
+    include_flows: bool = True,
+    include_dns: bool = True,
+    include_http: bool = True,
+    include_tls: bool = True,
+) -> int:
     flows: dict[str, Flow] = {}
     tcp_streams: dict[str, _TcpStream] = {}
     use_stdout = out_path.as_posix() == "-"
@@ -285,13 +294,17 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int, include_flows: bo
             else:
                 flows[key] = Flow(key, 1, len(pkt))
 
-            event = _extract_dns(pkt) or _extract_http(pkt)
+            event: dict[str, Any] | None = None
+            if include_dns:
+                event = _extract_dns(pkt)
+            if event is None and include_http:
+                event = _extract_http(pkt)
             if event:
                 event["ts"] = float(getattr(pkt, "time", 0.0))
                 event["flow"] = key
                 out.write(json.dumps(event) + "\n")
 
-            if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            if include_tls and pkt.haslayer(TCP) and pkt.haslayer(Raw):
                 payload = bytes(pkt[Raw].load)
                 stream = tcp_streams.setdefault(key, _TcpStream())
                 stream.push(int(pkt[TCP].seq), payload)

@@ -28,6 +28,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl
 python -m pcap_inspector inspect --pcap capture.pcap --out -
 # or omit flow summary rows (events-only):
 python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-flows
+# or filter event types:
+python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
 ```
 
 ## Summary

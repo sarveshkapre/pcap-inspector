@@ -8,6 +8,7 @@
 - Add `summary` command for aggregate stats (use `--json` for machine-readable output).
 - Add `--no-include-flows` to output events-only JSONL.
 - Add `ts` timestamps to event records (dns/http/tls).
+- Add `--include-*`/`--no-include-*` filters for dns/http/tls events.
 
 ## How to verify
 

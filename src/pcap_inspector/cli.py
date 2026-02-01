@@ -26,6 +26,24 @@ def main(argv: list[str] | None = None) -> int:
         default=True,
         help="Include flow summary rows in JSONL output",
     )
+    p_run.add_argument(
+        "--include-dns",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include DNS events in JSONL output",
+    )
+    p_run.add_argument(
+        "--include-http",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include HTTP events in JSONL output",
+    )
+    p_run.add_argument(
+        "--include-tls",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include TLS ClientHello events in JSONL output",
+    )
     p_run.set_defaults(func=_run)
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
@@ -45,6 +63,9 @@ def _run(args: argparse.Namespace) -> int:
         Path(args.out),
         int(args.max_packets),
         include_flows=bool(args.include_flows),
+        include_dns=bool(args.include_dns),
+        include_http=bool(args.include_http),
+        include_tls=bool(args.include_tls),
     )
 
 
