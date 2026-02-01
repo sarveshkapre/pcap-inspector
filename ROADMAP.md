@@ -8,4 +8,4 @@
 
 - Improve TCP stream reassembly (more reliable TLS/HTTP parsing).
 - Flow timeline visualization.
-- CLI summary mode (aggregate stats).
+- Allow omitting flow rows from JSONL (events-only mode).

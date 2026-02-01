@@ -38,8 +38,9 @@ make typecheck
 - TLS ClientHello SNI/ALPN extraction (best-effort).
 - `--out -` support to stream JSONL to stdout.
 - IPv6 support (`IPv6` layer) for flow keys + metadata extraction.
+- `summary` command to print aggregate stats (optionally JSON).
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add optional `--summary` mode to print aggregate stats without writing full JSONL.
+- Add `--include-flows` toggle to omit flow rows from JSONL when you only care about events.

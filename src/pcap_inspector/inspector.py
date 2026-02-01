@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import Counter
 from contextlib import nullcontext
 from dataclasses import dataclass
 from dataclasses import field
@@ -304,3 +305,127 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int) -> int:
     if not use_stdout:
         print(f"wrote {out_path}")
     return 0
+
+
+def summarize_pcap(path: Path, max_packets: int, top_n: int = 10) -> dict[str, Any]:
+    flows: dict[str, Flow] = {}
+    tcp_streams: dict[str, _TcpStream] = {}
+
+    ip_packets = 0
+    ip_bytes = 0
+    packets_seen = 0
+
+    dns_qnames: Counter[str] = Counter()
+    tls_sni: Counter[str] = Counter()
+    http_methods: Counter[str] = Counter()
+    http_status_codes: Counter[str] = Counter()
+
+    http_requests = 0
+    http_responses = 0
+    tls_client_hellos = 0
+
+    tcp_flow_keys: set[str] = set()
+    udp_flow_keys: set[str] = set()
+
+    for pkt in _iter_packets(path):
+        packets_seen += 1
+        if max_packets and packets_seen > max_packets:
+            break
+
+        if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
+            continue
+
+        ip_packets += 1
+        ip_bytes += len(pkt)
+
+        ip = pkt[IP] if pkt.haslayer(IP) else pkt[IPv6]
+        proto = "TCP" if pkt.haslayer(TCP) else "UDP" if pkt.haslayer(UDP) else "IP"
+        sport = (
+            int(pkt[TCP].sport)
+            if pkt.haslayer(TCP)
+            else int(pkt[UDP].sport)
+            if pkt.haslayer(UDP)
+            else 0
+        )
+        dport = (
+            int(pkt[TCP].dport)
+            if pkt.haslayer(TCP)
+            else int(pkt[UDP].dport)
+            if pkt.haslayer(UDP)
+            else 0
+        )
+        key = _flow_key(ip.src, sport, ip.dst, dport, proto)
+        prev = flows.get(key)
+        if prev:
+            flows[key] = Flow(key, prev.packets + 1, prev.bytes + len(pkt))
+        else:
+            flows[key] = Flow(key, 1, len(pkt))
+
+        if proto == "TCP":
+            tcp_flow_keys.add(key)
+        elif proto == "UDP":
+            udp_flow_keys.add(key)
+
+        dns = _extract_dns(pkt)
+        if dns and dns.get("qname"):
+            dns_qnames[str(dns["qname"])] += 1
+
+        http = _extract_http(pkt)
+        if http:
+            if "request_line" in http:
+                http_requests += 1
+                method = str(http["request_line"]).split(" ", 1)[0]
+                if method:
+                    http_methods[method] += 1
+            elif "status_line" in http:
+                http_responses += 1
+                parts = str(http["status_line"]).split(" ", 2)
+                if len(parts) >= 2 and parts[1].isdigit():
+                    http_status_codes[parts[1]] += 1
+
+        if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            payload = bytes(pkt[Raw].load)
+            stream = tcp_streams.setdefault(key, _TcpStream())
+            stream.push(int(pkt[TCP].seq), payload)
+            if not stream.extracted:
+                meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
+                if meta:
+                    tls_client_hellos += 1
+                    if "sni" in meta:
+                        tls_sni[str(meta["sni"])] += 1
+                    stream.extracted = True
+
+    return {
+        "pcap": str(path),
+        "totals": {
+            "packets_seen": packets_seen,
+            "max_packets": max_packets,
+            "ip_packets": ip_packets,
+            "ip_bytes": ip_bytes,
+            "flows": len(flows),
+            "tcp_flows": len(tcp_flow_keys),
+            "udp_flows": len(udp_flow_keys),
+            "dns_queries": sum(dns_qnames.values()),
+            "http_requests": http_requests,
+            "http_responses": http_responses,
+            "tls_client_hellos": tls_client_hellos,
+        },
+        "top_dns_qnames": _top_named(dns_qnames, top_n),
+        "top_tls_sni": _top_named(tls_sni, top_n),
+        "http_methods": dict(http_methods),
+        "http_status_codes": dict(http_status_codes),
+        "top_flows_by_bytes": _top_flows_by_bytes(flows, top_n),
+    }
+
+
+def _top_named(counter: Counter[str], top_n: int) -> list[dict[str, object]]:
+    if top_n <= 0:
+        return []
+    return [{"name": name, "count": count} for name, count in counter.most_common(top_n)]
+
+
+def _top_flows_by_bytes(flows: dict[str, Flow], top_n: int) -> list[dict[str, object]]:
+    if top_n <= 0:
+        return []
+    top = sorted(flows.values(), key=lambda f: f.bytes, reverse=True)[:top_n]
+    return [{"name": f.key, "count": f.bytes} for f in top]

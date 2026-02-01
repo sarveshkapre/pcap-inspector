@@ -6,7 +6,7 @@ from pathlib import Path
 from scapy.all import DNS, DNSQR, IP, IPv6, UDP, wrpcap
 from scapy.all import Raw, TCP
 
-from pcap_inspector.inspector import inspect_pcap
+from pcap_inspector.inspector import inspect_pcap, summarize_pcap
 
 
 def _tls_client_hello_record(*, sni: str) -> bytes:
@@ -82,3 +82,24 @@ def test_inspect_pcap_ipv6_flow_keys(tmp_path: Path) -> None:
         e.get("type") == "dns" and e.get("flow") == "[2001:db8::1]:1234->[2001:db8::2]:53 UDP"
         for e in events
     )
+
+
+def test_summarize_pcap(tmp_path: Path) -> None:
+    dns_pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    http_pkt = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pcap = tmp_path / "mix.pcap"
+    wrpcap(str(pcap), [dns_pkt, http_pkt])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=10)
+    totals = summary["totals"]
+    assert totals["flows"] == 2
+    assert totals["dns_queries"] == 1
+    assert totals["http_requests"] == 1
