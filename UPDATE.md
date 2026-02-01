@@ -14,10 +14,12 @@ python -m pcap_inspector inspect --pcap path/to/capture.pcap --out -
 
 ## PR
 
-If you have GitHub CLI set up:
+PR: https://github.com/sarveshkapre/pcap-inspector/pull/1
+
+If you need to recreate the PR:
 
 ```bash
+git checkout feat/tls-sni-stdout
 git push -u origin HEAD
 gh pr create --fill
 ```
-
