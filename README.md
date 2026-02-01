@@ -5,6 +5,7 @@ Minimal PCAP analyzer that extracts flow summaries and basic DNS/HTTP metadata.
 ## Scope (v0.1.0)
 
 - Flow summary (src/dst/ports/proto).
+- IPv4 + IPv6 support.
 - DNS query metadata.
 - HTTP request/response line extraction (best-effort).
 - TLS ClientHello SNI/ALPN extraction (best-effort).

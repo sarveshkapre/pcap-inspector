@@ -16,7 +16,7 @@ PCAP Inspector is a minimalist CLI that turns a `.pcap` into JSONL flow summarie
 
 - TCP stream reassembly is best-effort; out-of-order/retransmits and multi-record handshakes may be missed.
 - TLS parsing is intentionally minimal (ClientHello-only), and will not decode encrypted application data.
-- IPv6 packets are currently ignored (only `IP`, not `IPv6`).
+- IPv6 parsing is new; validate against real-world captures.
 - PCAPNG support is not guaranteed (depends on Scapy reader support for the file).
 
 ## Commands
@@ -37,8 +37,9 @@ make typecheck
 
 - TLS ClientHello SNI/ALPN extraction (best-effort).
 - `--out -` support to stream JSONL to stdout.
+- IPv6 support (`IPv6` layer) for flow keys + metadata extraction.
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add IPv6 support (`IPv6` layer) for flow keys + metadata extraction.
+- Add optional `--summary` mode to print aggregate stats without writing full JSONL.

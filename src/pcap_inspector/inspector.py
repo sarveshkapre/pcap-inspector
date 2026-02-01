@@ -8,7 +8,7 @@ from dataclasses import field
 from pathlib import Path
 from typing import Any, Iterable, TextIO, cast
 
-from scapy.all import DNS, DNSQR, IP, TCP, UDP, PcapReader, Raw
+from scapy.all import DNS, DNSQR, IP, IPv6, TCP, UDP, PcapReader, Raw
 
 
 @dataclass(frozen=True)
@@ -22,7 +22,13 @@ class Flow:
 
 
 def _flow_key(src: str, sport: int, dst: str, dport: int, proto: str) -> str:
-    return f"{src}:{sport}->{dst}:{dport} {proto}"
+    return f"{_fmt_hostport(src, sport)}->{_fmt_hostport(dst, dport)} {proto}"
+
+
+def _fmt_hostport(host: str, port: int) -> str:
+    if ":" in host:
+        return f"[{host}]:{port}"
+    return f"{host}:{port}"
 
 
 def _iter_packets(path: Path) -> Iterable[Any]:
@@ -253,9 +259,9 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int) -> int:
             count += 1
             if max_packets and count > max_packets:
                 break
-            if not pkt.haslayer(IP):
+            if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
                 continue
-            ip = pkt[IP]
+            ip = pkt[IP] if pkt.haslayer(IP) else pkt[IPv6]
             proto = "TCP" if pkt.haslayer(TCP) else "UDP" if pkt.haslayer(UDP) else "IP"
             sport = (
                 int(pkt[TCP].sport)

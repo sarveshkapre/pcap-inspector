@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scapy.all import DNS, DNSQR, IP, UDP, wrpcap
+from scapy.all import DNS, DNSQR, IP, IPv6, UDP, wrpcap
 from scapy.all import Raw, TCP
 
 from pcap_inspector.inspector import inspect_pcap
@@ -64,3 +64,21 @@ def test_inspect_pcap_extracts_tls_sni(tmp_path: Path) -> None:
     inspect_pcap(pcap, out, max_packets=0)
     events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
     assert any(e.get("type") == "tls" and e.get("sni") == "example.com" for e in events)
+
+
+def test_inspect_pcap_ipv6_flow_keys(tmp_path: Path) -> None:
+    pkt = (
+        IPv6(src="2001:db8::1", dst="2001:db8::2")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    pcap = tmp_path / "v6.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0)
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert any(
+        e.get("type") == "dns" and e.get("flow") == "[2001:db8::1]:1234->[2001:db8::2]:53 UDP"
+        for e in events
+    )
