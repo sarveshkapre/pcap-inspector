@@ -6,5 +6,5 @@
 
 ## Next
 
-- TLS SNI extraction.
+- Improve TCP stream reassembly (more reliable TLS/HTTP parsing).
 - Flow timeline visualization.

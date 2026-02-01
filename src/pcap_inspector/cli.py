@@ -13,7 +13,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("inspect", help="Inspect a PCAP file")
     p_run.add_argument("--pcap", required=True, help="Path to .pcap file")
-    p_run.add_argument("--out", default="pcap-report.jsonl")
+    p_run.add_argument(
+        "--out", default="pcap-report.jsonl", help="Output path (.jsonl) or '-' for stdout"
+    )
     p_run.add_argument("--max-packets", type=int, default=0, help="0 = no limit")
     p_run.set_defaults(func=_run)
 
