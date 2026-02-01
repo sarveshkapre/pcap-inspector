@@ -10,6 +10,7 @@
 - Add `ts` timestamps to event records (dns/http/tls).
 - Add `--include-*`/`--no-include-*` filters for dns/http/tls events.
 - Add `--sort-flows` for deterministic flow row ordering.
+- Add `schema` command and `SCHEMA.md` documenting JSONL record fields.
 
 ## How to verify
 

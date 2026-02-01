@@ -39,3 +39,11 @@ python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --s
 python -m pcap_inspector summary --pcap capture.pcap
 python -m pcap_inspector summary --pcap capture.pcap --json
 ```
+
+## JSONL Schema
+
+```bash
+python -m pcap_inspector schema > schema.json
+```
+
+See `SCHEMA.md` for documented fields.

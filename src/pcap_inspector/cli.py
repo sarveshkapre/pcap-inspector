@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .inspector import inspect_pcap, summarize_pcap
+from .schema import JSONL_SCHEMA
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     p_summary.add_argument("--top", type=int, default=10, help="Number of top items to show")
     p_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     p_summary.set_defaults(func=_summary)
+
+    p_schema = sub.add_parser("schema", help="Print JSON Schema for JSONL records")
+    p_schema.set_defaults(func=_schema)
 
     args = parser.parse_args(argv)
     return int(args.func(args))
@@ -119,6 +123,11 @@ def _write_kv_list(title: str, mapping: dict[str, int]) -> None:
     sys.stdout.write(f"\n{title}\n")
     for key in sorted(mapping):
         sys.stdout.write(f"  {key:<8} {mapping[key]}\n")
+
+
+def _schema(_: argparse.Namespace) -> int:
+    sys.stdout.write(json.dumps(JSONL_SCHEMA, indent=2, sort_keys=True) + "\n")
+    return 0
 
 
 if __name__ == "__main__":

@@ -43,8 +43,9 @@ make typecheck
 - Event records now include `ts` (pcap packet timestamp).
 - Event filters: `--no-include-dns/--no-include-http/--no-include-tls`.
 - Stable flow ordering: `--sort-flows`.
+- JSONL schema: `schema` command + `SCHEMA.md`.
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add JSON Schema (or at least documented fields) for JSONL record types.
+- Add `--stats` output to `inspect` (e.g., to stderr) so piping JSONL doesn't lose a quick summary.
