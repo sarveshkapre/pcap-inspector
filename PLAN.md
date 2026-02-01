@@ -40,8 +40,9 @@ make typecheck
 - IPv6 support (`IPv6` layer) for flow keys + metadata extraction.
 - `summary` command to print aggregate stats (optionally JSON).
 - `--no-include-flows` option to emit events-only JSONL.
+- Event records now include `ts` (pcap packet timestamp).
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add per-event timestamps (pcap time) to JSONL records.
+- Add `--include-tls/--include-http/--include-dns` filters to reduce noise.

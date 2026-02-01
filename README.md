@@ -10,6 +10,7 @@ Minimal PCAP analyzer that extracts flow summaries and basic DNS/HTTP metadata.
 - HTTP request/response line extraction (best-effort).
 - TLS ClientHello SNI/ALPN extraction (best-effort).
 - JSONL output.
+- Event records include `ts` (pcap packet timestamp, seconds since epoch).
 
 ## Quickstart
 

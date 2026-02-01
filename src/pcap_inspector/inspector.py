@@ -287,6 +287,7 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int, include_flows: bo
 
             event = _extract_dns(pkt) or _extract_http(pkt)
             if event:
+                event["ts"] = float(getattr(pkt, "time", 0.0))
                 event["flow"] = key
                 out.write(json.dumps(event) + "\n")
 
@@ -297,7 +298,17 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int, include_flows: bo
                 if not stream.extracted:
                     meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
                     if meta:
-                        out.write(json.dumps({"type": "tls", "flow": key, **meta}) + "\n")
+                        out.write(
+                            json.dumps(
+                                {
+                                    "type": "tls",
+                                    "ts": float(getattr(pkt, "time", 0.0)),
+                                    "flow": key,
+                                    **meta,
+                                }
+                            )
+                            + "\n"
+                        )
                         stream.extracted = True
 
         if include_flows:

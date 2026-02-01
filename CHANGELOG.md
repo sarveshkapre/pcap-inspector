@@ -7,6 +7,7 @@
 - Add IPv6 support for flow keys + metadata extraction.
 - Add `summary` command for aggregate stats.
 - Add `--no-include-flows` to omit flow rows from JSONL output.
+- Add `ts` timestamps to event records (dns/http/tls).
 
 ## v0.1.0 - 2026-01-31
 

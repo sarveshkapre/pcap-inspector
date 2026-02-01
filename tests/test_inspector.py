@@ -49,6 +49,7 @@ def test_inspect_pcap(tmp_path: Path) -> None:
     inspect_pcap(pcap, out, max_packets=0)
     lines = out.read_text(encoding="utf-8").splitlines()
     assert any(json.loads(line).get("type") == "dns" for line in lines)
+    assert any("ts" in json.loads(line) for line in lines)
 
 
 def test_inspect_pcap_extracts_tls_sni(tmp_path: Path) -> None:
