@@ -29,6 +29,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out -
 python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-flows
 # or filter event types:
 python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
+# stable ordering for diffing:
+python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --sort-flows
 ```
 
 ## Summary

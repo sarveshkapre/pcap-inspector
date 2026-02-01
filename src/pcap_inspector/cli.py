@@ -44,6 +44,12 @@ def main(argv: list[str] | None = None) -> int:
         default=True,
         help="Include TLS ClientHello events in JSONL output",
     )
+    p_run.add_argument(
+        "--sort-flows",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Sort flow summary rows by flow key",
+    )
     p_run.set_defaults(func=_run)
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
@@ -63,6 +69,7 @@ def _run(args: argparse.Namespace) -> int:
         Path(args.out),
         int(args.max_packets),
         include_flows=bool(args.include_flows),
+        sort_flows=bool(args.sort_flows),
         include_dns=bool(args.include_dns),
         include_http=bool(args.include_http),
         include_tls=bool(args.include_tls),

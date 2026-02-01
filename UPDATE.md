@@ -9,6 +9,7 @@
 - Add `--no-include-flows` to output events-only JSONL.
 - Add `ts` timestamps to event records (dns/http/tls).
 - Add `--include-*`/`--no-include-*` filters for dns/http/tls events.
+- Add `--sort-flows` for deterministic flow row ordering.
 
 ## How to verify
 

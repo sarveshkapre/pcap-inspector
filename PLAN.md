@@ -42,8 +42,9 @@ make typecheck
 - `--no-include-flows` option to emit events-only JSONL.
 - Event records now include `ts` (pcap packet timestamp).
 - Event filters: `--no-include-dns/--no-include-http/--no-include-tls`.
+- Stable flow ordering: `--sort-flows`.
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add optional `--sort-flows` for stable flow ordering in output.
+- Add JSON Schema (or at least documented fields) for JSONL record types.

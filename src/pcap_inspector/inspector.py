@@ -252,6 +252,7 @@ def inspect_pcap(
     max_packets: int,
     *,
     include_flows: bool = True,
+    sort_flows: bool = False,
     include_dns: bool = True,
     include_http: bool = True,
     include_tls: bool = True,
@@ -325,7 +326,10 @@ def inspect_pcap(
                         stream.extracted = True
 
         if include_flows:
-            for flow in flows.values():
+            flow_values = list(flows.values())
+            if sort_flows:
+                flow_values.sort(key=lambda f: f.key)
+            for flow in flow_values:
                 out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
     if not use_stdout:
         print(f"wrote {out_path}")
