@@ -6,6 +6,7 @@
 - Support `--out -` to write JSONL to stdout.
 - Add IPv6 support for flow keys + metadata extraction.
 - Add `summary` command for aggregate stats.
+- Add `--no-include-flows` to omit flow rows from JSONL output.
 
 ## v0.1.0 - 2026-01-31
 

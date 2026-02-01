@@ -20,6 +20,12 @@ def main(argv: list[str] | None = None) -> int:
         "--out", default="pcap-report.jsonl", help="Output path (.jsonl) or '-' for stdout"
     )
     p_run.add_argument("--max-packets", type=int, default=0, help="0 = no limit")
+    p_run.add_argument(
+        "--include-flows",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include flow summary rows in JSONL output",
+    )
     p_run.set_defaults(func=_run)
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
@@ -34,7 +40,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
-    return inspect_pcap(Path(args.pcap), Path(args.out), args.max_packets)
+    return inspect_pcap(
+        Path(args.pcap),
+        Path(args.out),
+        int(args.max_packets),
+        include_flows=bool(args.include_flows),
+    )
 
 
 def _summary(args: argparse.Namespace) -> int:

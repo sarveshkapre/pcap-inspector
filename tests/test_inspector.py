@@ -84,6 +84,22 @@ def test_inspect_pcap_ipv6_flow_keys(tmp_path: Path) -> None:
     )
 
 
+def test_inspect_pcap_no_flows(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    pcap = tmp_path / "test.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0, include_flows=False)
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert any(e.get("type") == "dns" for e in events)
+    assert not any(e.get("type") == "flow" for e in events)
+
+
 def test_summarize_pcap(tmp_path: Path) -> None:
     dns_pkt = (
         IP(src="1.1.1.1", dst="8.8.8.8")

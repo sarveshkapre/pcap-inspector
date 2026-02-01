@@ -246,7 +246,7 @@ def _parse_tls_alpn_extension(ext: bytes) -> list[str]:
     return protos
 
 
-def inspect_pcap(path: Path, out_path: Path, max_packets: int) -> int:
+def inspect_pcap(path: Path, out_path: Path, max_packets: int, include_flows: bool = True) -> int:
     flows: dict[str, Flow] = {}
     tcp_streams: dict[str, _TcpStream] = {}
     use_stdout = out_path.as_posix() == "-"
@@ -300,8 +300,9 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int) -> int:
                         out.write(json.dumps({"type": "tls", "flow": key, **meta}) + "\n")
                         stream.extracted = True
 
-        for flow in flows.values():
-            out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
+        if include_flows:
+            for flow in flows.values():
+                out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
     if not use_stdout:
         print(f"wrote {out_path}")
     return 0

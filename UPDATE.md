@@ -6,6 +6,7 @@
 - Support `--out -` to stream JSONL to stdout (useful for piping into `jq`, `rg`, etc.).
 - Add IPv6 support for flow keys + metadata extraction.
 - Add `summary` command for aggregate stats (use `--json` for machine-readable output).
+- Add `--no-include-flows` to output events-only JSONL.
 
 ## How to verify
 

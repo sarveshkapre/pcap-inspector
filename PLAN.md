@@ -39,8 +39,9 @@ make typecheck
 - `--out -` support to stream JSONL to stdout.
 - IPv6 support (`IPv6` layer) for flow keys + metadata extraction.
 - `summary` command to print aggregate stats (optionally JSON).
+- `--no-include-flows` option to emit events-only JSONL.
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add `--include-flows` toggle to omit flow rows from JSONL when you only care about events.
+- Add per-event timestamps (pcap time) to JSONL records.

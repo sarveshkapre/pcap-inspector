@@ -24,6 +24,8 @@ make check
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl
 # or stream JSONL to stdout:
 python -m pcap_inspector inspect --pcap capture.pcap --out -
+# or omit flow summary rows (events-only):
+python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-flows
 ```
 
 ## Summary
