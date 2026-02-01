@@ -1,7 +1,44 @@
 # PLAN.md
 
-## MVP
+## Product Pitch
 
-- Flow summary.
-- DNS/HTTP metadata extraction.
-- JSONL output.
+PCAP Inspector is a minimalist CLI that turns a `.pcap` into JSONL flow summaries + protocol metadata for fast triage.
+
+## Current Features
+
+- Flow summaries (src/dst/ports/proto, packet/byte counts).
+- DNS query metadata (qname, id, qr).
+- HTTP request/status line extraction (best-effort, per packet).
+- TLS ClientHello metadata extraction (best-effort: SNI, ALPN).
+- JSONL output to a file or stdout (`--out -`).
+
+## Top Risks / Unknowns
+
+- TCP stream reassembly is best-effort; out-of-order/retransmits and multi-record handshakes may be missed.
+- TLS parsing is intentionally minimal (ClientHello-only), and will not decode encrypted application data.
+- IPv6 packets are currently ignored (only `IP`, not `IPv6`).
+- PCAPNG support is not guaranteed (depends on Scapy reader support for the file).
+
+## Commands
+
+See `PROJECT.md` for the canonical commands, or run:
+
+```bash
+make setup
+make check
+make test
+make lint
+make typecheck
+```
+
+## Shipped
+
+### 2026-02-01
+
+- TLS ClientHello SNI/ALPN extraction (best-effort).
+- `--out -` support to stream JSONL to stdout.
+
+## Next Up (Tight Scope)
+
+- Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
+- Add IPv6 support (`IPv6` layer) for flow keys + metadata extraction.

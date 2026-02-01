@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import sys
+from contextlib import nullcontext
 from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, TextIO, cast
 
 from scapy.all import DNS, DNSQR, IP, TCP, UDP, PcapReader, Raw
 
@@ -57,11 +60,195 @@ def _extract_http(pkt: Any) -> dict[str, Any] | None:
     return None
 
 
+@dataclass(slots=True)
+class _TcpStream:
+    max_bytes: int = 256 * 1024
+    base_seq: int | None = None
+    next_seq: int | None = None
+    assembled: bytearray = field(default_factory=bytearray)
+    segments: dict[int, bytes] = field(default_factory=dict)
+    extracted: bool = False
+
+    def push(self, seq: int, payload: bytes) -> None:
+        if self.extracted or not payload:
+            return
+        if self.base_seq is None:
+            self.base_seq = seq
+            self.next_seq = seq
+        self.segments[seq] = payload
+        self._drain()
+
+    def _drain(self) -> None:
+        if self.next_seq is None:
+            return
+        while len(self.assembled) < self.max_bytes:
+            limit = self.max_bytes - len(self.assembled)
+            candidate: tuple[int, bytes] | None = None
+            for seg_seq, seg_payload in self.segments.items():
+                seg_end = seg_seq + len(seg_payload)
+                if seg_seq <= self.next_seq < seg_end:
+                    if candidate is None or seg_seq < candidate[0]:
+                        candidate = (seg_seq, seg_payload)
+            if candidate is None:
+                return
+            seg_seq, seg_payload = candidate
+            del self.segments[seg_seq]
+            if self.next_seq > seg_seq:
+                seg_payload = seg_payload[self.next_seq - seg_seq :]
+            if not seg_payload:
+                continue
+            take = seg_payload[:limit]
+            self.assembled.extend(take)
+            self.next_seq += len(take)
+            if len(take) < len(seg_payload):
+                return
+
+
+def _extract_tls_client_hello_metadata(data: bytes) -> dict[str, Any] | None:
+    scan_limit = min(256, max(0, len(data) - 5))
+    for offset in range(scan_limit + 1):
+        if data[offset : offset + 2] != b"\x16\x03":
+            continue
+        if offset + 5 > len(data):
+            continue
+        rec_len = int.from_bytes(data[offset + 3 : offset + 5], "big")
+        if rec_len <= 0:
+            continue
+        rec_end = offset + 5 + rec_len
+        if rec_end > len(data):
+            continue
+
+        body = data[offset + 5 : rec_end]
+        pos = 0
+        while pos + 4 <= len(body):
+            hs_type = body[pos]
+            hs_len = int.from_bytes(body[pos + 1 : pos + 4], "big")
+            hs_start = pos + 4
+            hs_end = hs_start + hs_len
+            if hs_end > len(body):
+                break
+            if hs_type == 0x01:  # ClientHello
+                meta = _parse_tls_client_hello(body[hs_start:hs_end])
+                if meta:
+                    return meta
+            pos = hs_end
+    return None
+
+
+def _parse_tls_client_hello(hello: bytes) -> dict[str, Any] | None:
+    # RFC 5246 (TLS 1.2) + RFC 8446 (TLS 1.3): best-effort parsing for SNI/ALPN.
+    if len(hello) < 34:  # version(2) + random(32)
+        return None
+    idx = 2 + 32
+    if idx + 1 > len(hello):
+        return None
+    session_id_len = hello[idx]
+    idx += 1 + session_id_len
+    if idx + 2 > len(hello):
+        return None
+    cipher_suites_len = int.from_bytes(hello[idx : idx + 2], "big")
+    idx += 2 + cipher_suites_len
+    if idx + 1 > len(hello):
+        return None
+    compression_methods_len = hello[idx]
+    idx += 1 + compression_methods_len
+    if idx + 2 > len(hello):
+        return None
+    extensions_len = int.from_bytes(hello[idx : idx + 2], "big")
+    idx += 2
+    if idx + extensions_len > len(hello):
+        return None
+
+    sni: str | None = None
+    alpn: list[str] = []
+    end = idx + extensions_len
+    while idx + 4 <= end:
+        ext_type = int.from_bytes(hello[idx : idx + 2], "big")
+        ext_len = int.from_bytes(hello[idx + 2 : idx + 4], "big")
+        idx += 4
+        if idx + ext_len > end:
+            break
+        ext = hello[idx : idx + ext_len]
+        idx += ext_len
+
+        if ext_type == 0x0000:  # server_name
+            parsed = _parse_tls_sni_extension(ext)
+            if parsed:
+                sni = parsed
+        elif ext_type == 0x0010:  # ALPN
+            alpn = _parse_tls_alpn_extension(ext)
+
+    if not sni and not alpn:
+        return None
+    out: dict[str, Any] = {}
+    if sni:
+        out["sni"] = sni
+    if alpn:
+        out["alpn"] = alpn
+    return out
+
+
+def _parse_tls_sni_extension(ext: bytes) -> str | None:
+    if len(ext) < 2:
+        return None
+    list_len = int.from_bytes(ext[0:2], "big")
+    if 2 + list_len > len(ext):
+        return None
+    pos = 2
+    end = 2 + list_len
+    while pos + 3 <= end:
+        name_type = ext[pos]
+        name_len = int.from_bytes(ext[pos + 1 : pos + 3], "big")
+        pos += 3
+        if pos + name_len > end:
+            return None
+        name = ext[pos : pos + name_len]
+        pos += name_len
+        if name_type == 0x00:
+            raw = name.decode("ascii", errors="ignore")
+            if not raw:
+                return None
+            try:
+                return raw.encode("ascii").decode("idna")
+            except UnicodeError:
+                return raw
+    return None
+
+
+def _parse_tls_alpn_extension(ext: bytes) -> list[str]:
+    if len(ext) < 2:
+        return []
+    list_len = int.from_bytes(ext[0:2], "big")
+    if 2 + list_len > len(ext):
+        return []
+    pos = 2
+    end = 2 + list_len
+    protos: list[str] = []
+    while pos < end:
+        if pos + 1 > end:
+            break
+        proto_len = ext[pos]
+        pos += 1
+        if pos + proto_len > end:
+            break
+        proto = ext[pos : pos + proto_len]
+        pos += proto_len
+        decoded = proto.decode("ascii", errors="ignore")
+        if decoded:
+            protos.append(decoded)
+    return protos
+
+
 def inspect_pcap(path: Path, out_path: Path, max_packets: int) -> int:
     flows: dict[str, Flow] = {}
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tcp_streams: dict[str, _TcpStream] = {}
+    use_stdout = out_path.as_posix() == "-"
+    if not use_stdout:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
     count = 0
-    with out_path.open("w", encoding="utf-8") as out:
+    out_ctx = nullcontext(sys.stdout) if use_stdout else out_path.open("w", encoding="utf-8")
+    with out_ctx as out:
+        out = cast(TextIO, out)
         for pkt in _iter_packets(path):
             count += 1
             if max_packets and count > max_packets:
@@ -96,7 +283,18 @@ def inspect_pcap(path: Path, out_path: Path, max_packets: int) -> int:
                 event["flow"] = key
                 out.write(json.dumps(event) + "\n")
 
+            if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+                payload = bytes(pkt[Raw].load)
+                stream = tcp_streams.setdefault(key, _TcpStream())
+                stream.push(int(pkt[TCP].seq), payload)
+                if not stream.extracted:
+                    meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
+                    if meta:
+                        out.write(json.dumps({"type": "tls", "flow": key, **meta}) + "\n")
+                        stream.extracted = True
+
         for flow in flows.values():
             out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
-    print(f"wrote {out_path}")
+    if not use_stdout:
+        print(f"wrote {out_path}")
     return 0

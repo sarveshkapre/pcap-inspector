@@ -24,4 +24,6 @@ python -m pcap_inspector --help
 
 ```bash
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl
+# or stream JSONL to stdout:
+python -m pcap_inspector inspect --pcap capture.pcap --out -
 ```
