@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
@@ -182,3 +183,20 @@ def test_summarize_pcap(tmp_path: Path) -> None:
     assert totals["flows"] == 2
     assert totals["dns_queries"] == 1
     assert totals["http_requests"] == 1
+
+
+def test_inspect_pcap_stats_json(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    pcap = tmp_path / "stats.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    out = tmp_path / "out.jsonl"
+    stats_out = io.StringIO()
+    inspect_pcap(pcap, out, max_packets=0, stats_out=stats_out, stats_json=True)
+    stats = json.loads(stats_out.getvalue())
+    assert stats["flows"] == 1
+    assert stats["dns_events"] == 1

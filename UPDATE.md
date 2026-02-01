@@ -11,6 +11,7 @@
 - Add `--include-*`/`--no-include-*` filters for dns/http/tls events.
 - Add `--sort-flows` for deterministic flow row ordering.
 - Add `schema` command and `SCHEMA.md` documenting JSONL record fields.
+- Add `--stats`/`--stats-json` to emit a summary to stderr after inspection.
 
 ## How to verify
 

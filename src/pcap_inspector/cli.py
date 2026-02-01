@@ -51,6 +51,16 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Sort flow summary rows by flow key",
     )
+    p_run.add_argument(
+        "--stats",
+        action="store_true",
+        help="Write a short summary to stderr after inspection",
+    )
+    p_run.add_argument(
+        "--stats-json",
+        action="store_true",
+        help="Write a JSON summary to stderr after inspection",
+    )
     p_run.set_defaults(func=_run)
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
@@ -68,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    stats_out = sys.stderr if args.stats or args.stats_json else None
     return inspect_pcap(
         Path(args.pcap),
         Path(args.out),
@@ -77,6 +88,8 @@ def _run(args: argparse.Namespace) -> int:
         include_dns=bool(args.include_dns),
         include_http=bool(args.include_http),
         include_tls=bool(args.include_tls),
+        stats_out=stats_out,
+        stats_json=bool(args.stats_json),
     )
 
 

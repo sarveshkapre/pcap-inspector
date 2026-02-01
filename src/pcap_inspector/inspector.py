@@ -256,6 +256,8 @@ def inspect_pcap(
     include_dns: bool = True,
     include_http: bool = True,
     include_tls: bool = True,
+    stats_out: TextIO | None = None,
+    stats_json: bool = False,
 ) -> int:
     flows: dict[str, Flow] = {}
     tcp_streams: dict[str, _TcpStream] = {}
@@ -263,15 +265,24 @@ def inspect_pcap(
     if not use_stdout:
         out_path.parent.mkdir(parents=True, exist_ok=True)
     count = 0
+    packets_seen = 0
+    ip_packets = 0
+    ip_bytes = 0
+    dns_events = 0
+    http_events = 0
+    tls_events = 0
     out_ctx = nullcontext(sys.stdout) if use_stdout else out_path.open("w", encoding="utf-8")
     with out_ctx as out:
         out = cast(TextIO, out)
         for pkt in _iter_packets(path):
             count += 1
+            packets_seen += 1
             if max_packets and count > max_packets:
                 break
             if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
                 continue
+            ip_packets += 1
+            ip_bytes += len(pkt)
             ip = pkt[IP] if pkt.haslayer(IP) else pkt[IPv6]
             proto = "TCP" if pkt.haslayer(TCP) else "UDP" if pkt.haslayer(UDP) else "IP"
             sport = (
@@ -304,6 +315,10 @@ def inspect_pcap(
                 event["ts"] = float(getattr(pkt, "time", 0.0))
                 event["flow"] = key
                 out.write(json.dumps(event) + "\n")
+                if event.get("type") == "dns":
+                    dns_events += 1
+                elif event.get("type") == "http":
+                    http_events += 1
 
             if include_tls and pkt.haslayer(TCP) and pkt.haslayer(Raw):
                 payload = bytes(pkt[Raw].load)
@@ -324,6 +339,7 @@ def inspect_pcap(
                             + "\n"
                         )
                         stream.extracted = True
+                        tls_events += 1
 
         if include_flows:
             flow_values = list(flows.values())
@@ -333,7 +349,38 @@ def inspect_pcap(
                 out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
     if not use_stdout:
         print(f"wrote {out_path}")
+    if stats_out is not None:
+        stats: dict[str, int | str] = {
+            "pcap": str(path),
+            "max_packets": max_packets,
+            "packets_seen": packets_seen,
+            "ip_packets": ip_packets,
+            "ip_bytes": ip_bytes,
+            "flows": len(flows),
+            "dns_events": dns_events,
+            "http_events": http_events,
+            "tls_events": tls_events,
+        }
+        if stats_json:
+            stats_out.write(json.dumps(stats, indent=2) + "\n")
+        else:
+            _write_stats_text(stats_out, stats)
     return 0
+
+
+def _write_stats_text(out: TextIO, stats: dict[str, int | str]) -> None:
+    out.write("Inspect Stats\n")
+    out.write(f"PCAP: {stats['pcap']}\n")
+    if stats["max_packets"]:
+        out.write(f"Max packets: {stats['max_packets']}\n")
+    out.write(
+        "Packets: {packets_seen} (IP: {ip_packets})\n"
+        "Flows: {flows}\n"
+        "Bytes: {ip_bytes}\n"
+        "DNS events: {dns_events}\n"
+        "HTTP events: {http_events}\n"
+        "TLS events: {tls_events}\n".format(**stats)
+    )
 
 
 def summarize_pcap(path: Path, max_packets: int, top_n: int = 10) -> dict[str, Any]:

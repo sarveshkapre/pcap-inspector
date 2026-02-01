@@ -44,8 +44,9 @@ make typecheck
 - Event filters: `--no-include-dns/--no-include-http/--no-include-tls`.
 - Stable flow ordering: `--sort-flows`.
 - JSONL schema: `schema` command + `SCHEMA.md`.
+- Inspect stats: `--stats` / `--stats-json` to stderr.
 
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add `--stats` output to `inspect` (e.g., to stderr) so piping JSONL doesn't lose a quick summary.
+- Add `--top` filters for `inspect` to only keep N most active flows/events.

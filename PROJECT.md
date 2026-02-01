@@ -32,6 +32,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-flows
 python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
 # stable ordering for diffing:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --sort-flows
+# emit a quick summary to stderr:
+python -m pcap_inspector inspect --pcap capture.pcap --out - --stats
 ```
 
 ## Summary
