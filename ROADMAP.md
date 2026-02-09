@@ -1,10 +1,11 @@
 # ROADMAP
 
-## v0.1.0
+## v0.1.1
 
-- Flow summary + DNS/HTTP metadata.
+- Flow summary + DNS/HTTP/TLS metadata.
+- Timestamp window filtering and basic flow filters for fast triage.
 
 ## Next
 
 - Flow timeline visualization.
-- Add timestamp range filtering for targeted triage runs.
+- Event-priority mode for `--top-events` (beyond packet order).

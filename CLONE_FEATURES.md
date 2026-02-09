@@ -8,16 +8,21 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P1: Add `--since-ts/--until-ts` timestamp-range filtering for `inspect` and `summary` (epoch seconds, inclusive).
-- [ ] P1: Add simple flow filtering flags (`--host`, `--port`, `--proto`) for fast triage without post-processing.
 - [ ] P2: Add event-priority mode (for example rank by flow byte-volume) to complement packet-order `--top-events`.
 - [ ] P2: Add a compact flow timeline output format for quick conversation sequencing (for example top flows with start/end/duration + event counts).
-- [ ] P2: Add `make bench-events` to benchmark DNS/HTTP/TLS extraction paths in addition to flows-only throughput.
-- [ ] P3: Improve PCAPNG compatibility story (detect file type; document behavior; better errors if unsupported).
 - [ ] P3: Add a JSON Schema for `summary --json` output for tooling integration / stability.
-- [ ] P3: Release hygiene: move shipped items into a new version in `CHANGELOG.md`/`RELEASE.md`, and bump version strings.
 
 ## Implemented
+- [x] 2026-02-09 P1: Add `--since-ts/--until-ts` timestamp-window filtering for `inspect` and `summary`.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, `tests/test_smoke.py`
+- [x] 2026-02-09 P1: Add basic flow filters (`--host/--port/--proto`) for `inspect` and `summary`.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, docs in `README.md`
+- [x] 2026-02-09 P2: Improve operator errors for PCAPNG/non-PCAP inputs (no traceback; actionable hint).
+  Evidence: `src/pcap_inspector/inspector.py`, `tests/test_smoke.py` (`test_pcapng_errors_cleanly`)
+- [x] 2026-02-09 P2: Add `make bench-events` to benchmark event extraction throughput and memory signals.
+  Evidence: `Makefile`, `scripts/bench_inspect.py`, `PROJECT.md`
+- [x] 2026-02-09 P2: Release hygiene: move shipped items into `v0.1.1` in `CHANGELOG.md`/`RELEASE.md` and bump version strings.
+  Evidence: `CHANGELOG.md`, `RELEASE.md`, `pyproject.toml`, `src/pcap_inspector/cli.py`, `README.md`, `ROADMAP.md`
 - [x] 2026-02-09 P0: Add a benchmark script + reproducible fixture generator to track `inspect` throughput and memory (RSS).
   Evidence: `scripts/bench_inspect.py`, `Makefile` (`make bench`)
 - [x] 2026-02-09 P0: Silence noisy Scapy runtime warnings during CLI usage.

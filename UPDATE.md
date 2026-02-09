@@ -40,11 +40,17 @@ Do not open PRs for this repo; commit directly to `main`.
 - Add `--normalize-flows` to aggregate bidirectional conversations in both `inspect` and `summary`.
 - Refactor shared flow parsing used by `inspect` and `summary` to reduce behavior drift.
 - Make summary top-flow ordering deterministic when flows have equal byte counts.
+- Add timestamp window filtering for targeted triage (`--since-ts/--until-ts`).
+- Add basic flow filters (`--host/--port/--proto`) to focus on specific conversations quickly.
+- Improve operator errors for PCAPNG and non-PCAP inputs (no traceback; actionable hint).
+- Add `make bench-events` to benchmark event extraction paths (in addition to flows-only bench).
 
 ## How to verify
 
 ```bash
 make check
-python -m pcap_inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --normalize-flows --stats-json
-python -m pcap_inspector summary --pcap path/to/capture.pcap --json --normalize-flows
+python -m pcap_inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp --stats-json
+python -m pcap_inspector summary --pcap path/to/capture.pcap --json --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp
+make bench
+make bench-events
 ```

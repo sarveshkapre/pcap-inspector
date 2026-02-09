@@ -2,28 +2,21 @@
 
 ## Unreleased
 
-- Add `make bench` and a benchmark script to track `inspect` throughput and memory (RSS).
-- Silence noisy Scapy runtime warnings during CLI usage.
-- Improve CLI errors for missing/corrupt PCAP files (no traceback; actionable message).
-- Add `inspect --include-flow-times` to include per-flow `first_ts`/`last_ts` timestamps in flow rows.
-- Improve TCP stream reassembly handling for out-of-order and retransmitted segments.
-- Fix `max_packets` packet accounting in `inspect` and `summary`.
-- Add `inspect --top-flows N` to include only top flow rows by bytes.
-- Add `inspect --top-events N` to cap emitted DNS/HTTP/TLS event rows.
-- Add optional bidirectional flow normalization via `--normalize-flows`.
-- Refactor shared flow parsing logic used by both `inspect` and `summary`.
-- Make `summary` top-flow ordering deterministic when byte counts tie.
-- Expand HTTP request detection to common methods beyond GET/POST.
-- Add TLS ClientHello SNI/ALPN extraction (best-effort).
-- Support `--out -` to write JSONL to stdout.
-- Add IPv6 support for flow keys + metadata extraction.
-- Add `summary` command for aggregate stats.
-- Add `--no-include-flows` to omit flow rows from JSONL output.
-- Add `ts` timestamps to event records (dns/http/tls).
-- Add `--include-*`/`--no-include-*` event filters (dns/http/tls).
-- Add `--sort-flows` for stable flow row ordering.
-- Add `schema` command and `SCHEMA.md` to document JSONL record fields.
-- Add `--stats`/`--stats-json` to emit a summary to stderr after inspection.
+- Flow timeline visualization (compact timeline output for top conversations).
+- Event-priority mode for `--top-events` (packet-order vs flow-ranked).
+- Add a JSON Schema for `summary --json` output.
+
+## v0.1.1 - 2026-02-09
+
+- CLI: `summary`, `schema`, `--out -`, `--stats/--stats-json`.
+- Filtering/controls: `--top-flows`, `--top-events`, `--normalize-flows`, `--since-ts/--until-ts`,
+  `--host/--port/--proto`, `--no-include-flows`, `--include-*`/`--no-include-*`,
+  `--sort-flows`, `--include-flow-times`.
+- Metadata: DNS qname extraction; HTTP request/status lines (expanded methods); TLS ClientHello SNI/ALPN
+  (best-effort).
+- Reliability: improved TCP stream reassembly for out-of-order/retransmits; quieter Scapy logs; cleaner
+  errors for missing/corrupt inputs including PCAPNG hints.
+- Bench: `make bench` and `make bench-events` to track throughput and memory regression signals.
 
 ## v0.1.0 - 2026-01-31
 

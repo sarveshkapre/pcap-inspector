@@ -68,7 +68,7 @@ def _normalize_protos(values: Sequence[str]) -> set[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
-    parser.add_argument("--version", action="version", version="0.1.0")
+    parser.add_argument("--version", action="version", version="0.1.1")
 
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("inspect", help="Inspect a PCAP file")

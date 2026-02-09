@@ -61,5 +61,6 @@ make typecheck
 
 ## Next Up (Tight Scope)
 
-- Add a small benchmark fixture/script to track throughput and memory regressions.
-- Consider flow timeline visualization for top conversations.
+- Add a compact flow timeline output mode for top conversations.
+- Add event-priority mode for `--top-events` (beyond packet order).
+- Add a JSON Schema for `summary --json` output.

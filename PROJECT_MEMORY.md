@@ -50,3 +50,31 @@
 - Trust Label: verified-local
 - Follow-ups:
   - Keep memory entries updated with concrete commit IDs after each ship.
+
+## Entry: 2026-02-09-cycle2-triage-filters-and-input-hygiene
+- Decision: Add timestamp window filtering (`--since-ts/--until-ts`), add basic flow filters (`--host/--port/--proto`), and improve operator errors for PCAPNG/non-PCAP inputs.
+- Why: Real-world triage usually starts by narrowing to a time window and a small set of conversations; clearer errors reduce friction and avoid tracebacks on common file-format mistakes.
+- Evidence:
+  - Code: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`
+  - Tests: `tests/test_inspector.py`, `tests/test_smoke.py` (`test_invalid_time_window_rejected`, `test_pcapng_errors_cleanly`)
+  - Smoke: `.venv/bin/python -m pcap_inspector inspect --pcap bench/fixture-20000p-500f-0b.pcap --out - --max-packets 50 --top-events 3 --top-flows 2 --since-ts 1700000000 --until-ts 1700000000.01 --host 10.0.0.0 --port 53 --proto udp --stats-json`
+  - Verification: `make check`
+- Commit:
+  - Timestamp window: `89ece34`
+  - Flow filters: `5ba540f`
+  - PCAPNG/non-PCAP errors: `16d3622`
+- Confidence: High
+- Trust Label: verified-local
+- Follow-ups:
+  - Add a compact flow timeline output mode (top flows with start/end/duration + event counts).
+  - Add event-priority mode for `--top-events` beyond packet order.
+
+## Entry: 2026-02-09-cycle2-bench-events
+- Decision: Add `make bench-events` to benchmark DNS extraction paths (and optional TLS/HTTP when fixtures evolve) in addition to flows-only throughput.
+- Why: Reassembly and event extraction are the most likely sources of throughput and memory regressions; we want a quick regression signal in CI and local dev.
+- Evidence:
+  - Code: `Makefile`, `scripts/bench_inspect.py`, `PROJECT.md`
+  - Verification: `make bench-events` (prints JSON with elapsed_s/packets_per_s/maxrss_kb)
+- Commit: `d8346a6`
+- Confidence: High
+- Trust Label: verified-local
