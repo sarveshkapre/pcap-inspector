@@ -9,10 +9,21 @@
 
 ## Candidate Features To Do
 - [ ] P2: Add event-priority mode (for example rank by flow byte-volume) to complement packet-order `--top-events`.
-- [ ] P2: Add a compact flow timeline output format for quick conversation sequencing (for example top flows with start/end/duration + event counts).
-- [ ] P3: Add a JSON Schema for `summary --json` output for tooling integration / stability.
+- [ ] P2: Add an optional HTTP port filter (for example `--http-ports 80,8080`) to reduce false-positive HTTP parsing from arbitrary TCP payloads.
+- [ ] P2: Add a `--flows-format` option for `summary` and `timeline` output (text vs JSON) with stable keys for tooling.
+- [ ] P3: Add PCAPNG support (if feasible) via an alternate reader or conversion fallback; keep current errors as-is when unsupported.
+- [ ] P3: Add a streaming mode to emit flow rows periodically (not just at end) for very large captures.
+- [ ] P3: Add a `--bpf` or `--filter` option (restricted safe subset) for parity with common PCAP tooling.
 
 ## Implemented
+- [x] 2026-02-09 P1: Add `timeline` command (text + `--json`) to show top conversations with start/end/duration and event counts.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py` (`timeline_pcap`), `tests/test_inspector.py`, docs in `README.md`
+- [x] 2026-02-09 P1: Extend `--host` filtering to accept CIDR ranges (IPv4 + IPv6), for example `10.0.0.0/8` and `2001:db8::/32`.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py` (`_host_matches`, `host_nets`), `tests/test_inspector.py`
+- [x] 2026-02-09 P1: Update docs/examples to prefer `.venv/bin/pcap-inspector ...` over `python -m ...` for better out-of-the-box UX on systems without `python`.
+  Evidence: `README.md`, `PROJECT.md`, `SCHEMA.md`, `UPDATE.md`
+- [x] 2026-02-09 P2: Add a JSON Schema for `summary --json` output and expose it via `pcap-inspector schema --summary`.
+  Evidence: `src/pcap_inspector/schema.py`, `src/pcap_inspector/cli.py`, `tests/test_smoke.py`, `SCHEMA.md`
 - [x] 2026-02-09 P1: Add `--since-ts/--until-ts` timestamp-window filtering for `inspect` and `summary`.
   Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, `tests/test_smoke.py`
 - [x] 2026-02-09 P1: Add basic flow filters (`--host/--port/--proto`) for `inspect` and `summary`.
@@ -64,12 +75,16 @@
 - `main` is currently green in GitHub Actions; no open owner/bot-authored issues are pending.
 - Rebuilding stream assembly from retained segments materially improves TLS metadata recovery when packets arrive out of order.
 - Packet-limit stats now align with processed packets, making summary output trustworthy for bounded runs.
+- `timeline` provides a lightweight top-conversation sequencing view without producing a full JSONL report.
+- CIDR host filters are a high-leverage triage primitive (`--host 10.0.0.0/8`) that avoids post-processing.
+- `schema --summary` makes `summary --json` safer to consume in tooling (stable shape + backwards-compatible extensions).
 - `--top-flows` is a practical way to control JSONL size for noisy captures without losing event records.
 - `--top-events` now provides independent event-row backpressure for large captures.
 - `--normalize-flows` enables cleaner conversation-centric triage and reduces directional flow duplication in summaries.
 - Market scan (bounded): comparable tools emphasize time-range filtering, fast field filters, timelines, and machine-readable exports.
   Links:
   - Wireshark: display filters like `frame.time_epoch` enable time-range filtering while iterating captures: https://www.wireshark.org/docs/dfref/f/frame.html
+  - Tshark: JSON output modes (`-T ek/json/fields`) and format caveats for automation: https://www.wireshark.org/docs/man-pages/tshark.html
   - Zeek: protocol-aware logs designed for triage at scale (structured logging model): https://docs.zeek.org/en/master/logs/
   - Arkime: indexing + session timeline UI; APIs support `startTime`/`stopTime` for time windows: https://arkime.com/api
   - Suricata: produces JSON (EVE) events for alerts/metadata pipelines: https://docs.suricata.io/en/latest/output/eve/eve-json-format.html

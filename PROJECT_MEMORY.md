@@ -89,3 +89,28 @@
 - Commit: `2763c2c18e143901416f48cd7aec716bdf797fae`
 - Confidence: High
 - Trust Label: trusted
+
+## Entry: 2026-02-09-cycle3-timeline-cidr-and-summary-schema
+- Decision: Add `timeline` as a first-class command for compact conversation sequencing, extend `--host` to accept CIDR filters, and publish a JSON Schema for `summary --json`.
+- Why: Timeline views are a baseline expectation for PCAP triage, CIDR filtering is a high-leverage primitive for narrowing noisy captures, and schemas reduce downstream tooling risk as outputs evolve.
+- Evidence:
+  - Code: `src/pcap_inspector/inspector.py` (`timeline_pcap`, CIDR filtering), `src/pcap_inspector/cli.py` (`timeline`, `schema --summary`, CIDR parsing), `src/pcap_inspector/schema.py` (`SUMMARY_JSON_SCHEMA`)
+  - Tests: `tests/test_inspector.py` (CIDR + timeline), `tests/test_smoke.py` (`schema --summary`)
+  - Docs: `README.md`, `PROJECT.md`, `SCHEMA.md` (schema + timeline usage)
+  - Verification:
+    - `make check` (pass)
+    - `.venv/bin/pcap-inspector timeline --pcap bench/fixture-20000p-500f-0b.pcap --top 3` (prints timeline rows)
+- Mistakes And Fixes:
+  - Root cause: IPv6 CIDR test fixture accidentally matched on the destination address, so the filter did not exclude the "out" packet.
+  - Fix: Adjust the negative fixture so both src and dst fall outside the CIDR.
+  - Prevention rule: For filter tests, ensure "excluded" fixtures have no field (src/dst) that could match the filter predicate.
+- Commit:
+  - CIDR host filters: `ef4d5aad72d3353638263f503422dfe226439ffd`
+  - Summary JSON Schema: `951b6af632171ef651fb0b2eb1ca5496b7bb8bba`
+  - Timeline command: `5713f4afb1ba7624ae063c0c929d158524610cc4`
+  - Doc UX (use `.venv/bin/pcap-inspector`): `5e366e2d383788d1e7a6e3c1e46a9fc19bdd73e5`
+- Confidence: High
+- Trust Label: trusted
+- Follow-ups:
+  - Event-priority mode for `--top-events` beyond packet order.
+  - Optional HTTP port filtering to reduce false positives from arbitrary TCP payloads.
