@@ -8,11 +8,14 @@ PCAP Inspector is a minimalist CLI that turns a `.pcap` into JSONL flow summarie
 
 - Flow summaries (src/dst/ports/proto, packet/byte counts).
 - DNS query metadata (qname, id, qr).
-- HTTP request/status line extraction (best-effort, per packet).
+- HTTP request/status line extraction (best-effort, per packet; optional `--http-ports` filter).
 - TLS ClientHello metadata extraction (best-effort: SNI, ALPN).
 - JSONL output to a file or stdout (`--out -`).
 - Event output capping for high-volume captures (`--top-events`).
+- Event selection modes for capping (`--top-events-mode packet|flow-bytes`).
 - Optional bidirectional flow normalization (`--normalize-flows`).
+- Compact conversation timeline output (`timeline`, text or `--json`).
+- Machine-readable JSON schemas for JSON outputs (`schema`, `schema --summary`).
 
 ## Top Risks / Unknowns
 
@@ -61,6 +64,6 @@ make typecheck
 
 ## Next Up (Tight Scope)
 
-- Add a compact flow timeline output mode for top conversations.
-- Add event-priority mode for `--top-events` (beyond packet order).
-- Add a JSON Schema for `summary --json` output.
+- Add PCAPNG support (if feasible) via an alternate reader or conversion fallback.
+- Add restricted `--bpf` / `--filter` support for parity with common PCAP tooling.
+- Add optional TLS port filtering (`--tls-ports`) to reduce false positives.

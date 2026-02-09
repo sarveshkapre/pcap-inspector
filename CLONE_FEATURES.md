@@ -8,9 +8,6 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P1 (Selected cycle4): Add `inspect --top-events-mode` to complement packet-order `--top-events` with a flow-ranked option (for example by flow byte-volume).
-- [ ] P1 (Selected cycle4): Add `inspect --http-ports` (for example `80,8080`) to reduce false-positive HTTP parsing from arbitrary TCP payloads.
-- [ ] P1 (Selected cycle4): Release hygiene: bump to `v0.1.2` and align `CHANGELOG.md`/`RELEASE.md`/docs with shipped timeline/CIDR/schema improvements.
 - [ ] P2: Add a `--flows-format` option for `summary` and `timeline` output (text vs JSON) with stable keys for tooling (keep `--json` as an alias).
 - [ ] P2: Add optional TLS port filtering (for example `--tls-ports 443,8443`) to reduce false-positive TLS parsing from arbitrary TCP payloads.
 - [ ] P3: Add PCAPNG support (if feasible) via an alternate reader or conversion fallback; keep current errors as-is when unsupported.
@@ -19,6 +16,12 @@
 - [ ] P3: Add `--progress` to emit periodic stderr progress (packets processed, rate, flows, events) for long-running runs.
 
 ## Implemented
+- [x] 2026-02-09 P1: Add `inspect --top-events-mode flow-bytes` to prioritize events from highest-byte flows when `--top-events` is set.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, `tests/test_smoke.py`
+- [x] 2026-02-09 P1: Add `inspect --http-ports` to reduce false-positive HTTP parsing from arbitrary TCP payloads.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`
+- [x] 2026-02-09 P1: Release hygiene: bump version to `v0.1.2` and align release docs with shipped features/options.
+  Evidence: `pyproject.toml`, `CHANGELOG.md`, `RELEASE.md`, `README.md`, `PROJECT.md`, `PLAN.md`, `ROADMAP.md`, `UPDATE.md`
 - [x] 2026-02-09 P1: Add `timeline` command (text + `--json`) to show top conversations with start/end/duration and event counts.
   Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py` (`timeline_pcap`), `tests/test_inspector.py`, docs in `README.md`
 - [x] 2026-02-09 P1: Extend `--host` filtering to accept CIDR ranges (IPv4 + IPv6), for example `10.0.0.0/8` and `2001:db8::/32`.
@@ -83,15 +86,19 @@
 - `schema --summary` makes `summary --json` safer to consume in tooling (stable shape + backwards-compatible extensions).
 - `--top-flows` is a practical way to control JSONL size for noisy captures without losing event records.
 - `--top-events` now provides independent event-row backpressure for large captures.
+- `--top-events-mode flow-bytes` is useful for “what matters most” triage when you want a small event sample from the highest-volume conversations.
+- `--http-ports` is a low-cost precision knob that reduces spurious HTTP events when inspecting arbitrary TCP payloads.
 - `--normalize-flows` enables cleaner conversation-centric triage and reduces directional flow duplication in summaries.
 - Market scan (bounded): comparable tools emphasize time-range filtering, fast field filters, timelines, and machine-readable exports.
   Links:
   - Wireshark: display filters like `frame.time_epoch` enable time-range filtering while iterating captures: https://www.wireshark.org/docs/dfref/f/frame.html
   - Tshark: JSON output modes (`-T ek/json/fields`) and format caveats for automation: https://www.wireshark.org/docs/man-pages/tshark.html
+  - Termshark: terminal UI on top of tshark with Wireshark display filters + conversation/stream workflows: https://termshark.io/
   - Zeek: protocol-aware logs designed for triage at scale (structured logging model): https://docs.zeek.org/en/master/logs/
   - Arkime: indexing + session timeline UI; APIs support `startTime`/`stopTime` for time windows: https://arkime.com/api
   - Suricata: produces JSON (EVE) events for alerts/metadata pipelines: https://docs.suricata.io/en/latest/output/eve/eve-json-format.html
   - Brimcap/Zui: query-centric exploration of PCAP-derived structured data: https://github.com/brimdata/zui
+  - Wireshark tools: `capinfos` for quick capture metadata/stats; `editcap` for conversion/slicing: https://www.wireshark.org/docs/man-pages/capinfos.html https://www.wireshark.org/docs/man-pages/editcap.html
 
 ## Notes
 - This file is maintained by the autonomous clone loop.

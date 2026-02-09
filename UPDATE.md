@@ -44,13 +44,20 @@ Do not open PRs for this repo; commit directly to `main`.
 - Add basic flow filters (`--host/--port/--proto`) to focus on specific conversations quickly.
 - Improve operator errors for PCAPNG and non-PCAP inputs (no traceback; actionable hint).
 - Add `make bench-events` to benchmark event extraction paths (in addition to flows-only bench).
+- Add `timeline` command for compact conversation sequencing (text + `--json`).
+- Extend `--host` filtering to accept CIDR ranges (IPv4 + IPv6).
+- Add JSON Schema for `summary --json` output and expose it via `pcap-inspector schema --summary`.
+- Add `inspect --top-events-mode flow-bytes` to prioritize events from highest-byte flows.
+- Add `inspect --http-ports` to reduce false-positive HTTP parsing from arbitrary TCP payloads.
 
 ## How to verify
 
 ```bash
 make check
-.venv/bin/pcap-inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp --stats-json
+.venv/bin/pcap-inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --top-events-mode flow-bytes --http-ports 80,8080 --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp --stats-json
 .venv/bin/pcap-inspector summary --pcap path/to/capture.pcap --json --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp
+.venv/bin/pcap-inspector timeline --pcap path/to/capture.pcap --top 20 --json
+.venv/bin/pcap-inspector schema --summary > summary.schema.json
 make bench
 make bench-events
 ```
