@@ -24,3 +24,23 @@ python -m pcap_inspector summary --pcap path/to/capture.pcap
 ## PR
 
 Do not open PRs for this repo; commit directly to `main`.
+
+---
+
+# Update (2026-02-09)
+
+## What shipped
+
+- Improve TCP stream reassembly handling for out-of-order and retransmitted TCP segments.
+- Add `inspect --top-flows N` to keep only top flow rows by bytes in JSONL output.
+- Expand HTTP request extraction to support common methods beyond GET/POST.
+- Fix `max_packets` accounting so packet totals reflect processed packets only.
+- Add regression tests for out-of-order TLS, top-flow filtering, expanded HTTP methods, and packet-limit accounting.
+
+## How to verify
+
+```bash
+make check
+python -m pcap_inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --stats-json
+python -m pcap_inspector summary --pcap path/to/capture.pcap --json
+```

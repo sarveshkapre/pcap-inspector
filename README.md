@@ -29,6 +29,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out -
 python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-flows
 # or filter event types:
 python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
+# or keep only the top 20 flows by bytes in flow rows:
+python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-flows 20
 # stable ordering for diffing:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --sort-flows
 # emit a quick summary to stderr:

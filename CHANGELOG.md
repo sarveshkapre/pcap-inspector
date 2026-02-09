@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Improve TCP stream reassembly handling for out-of-order and retransmitted segments.
+- Fix `max_packets` packet accounting in `inspect` and `summary`.
+- Add `inspect --top-flows N` to include only top flow rows by bytes.
+- Expand HTTP request detection to common methods beyond GET/POST.
 - Add TLS ClientHello SNI/ALPN extraction (best-effort).
 - Support `--out -` to write JSONL to stdout.
 - Add IPv6 support for flow keys + metadata extraction.

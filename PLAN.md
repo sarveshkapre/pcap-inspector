@@ -46,7 +46,14 @@ make typecheck
 - JSONL schema: `schema` command + `SCHEMA.md`.
 - Inspect stats: `--stats` / `--stats-json` to stderr.
 
+### 2026-02-09
+
+- Improve TCP stream reassembly handling for out-of-order/retransmitted segments.
+- Add `inspect --top-flows N` to include only top flow rows by bytes.
+- Expand HTTP request extraction to include common methods beyond GET/POST.
+- Fix `max_packets` packet accounting to count only processed packets.
+
 ## Next Up (Tight Scope)
 
 - Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add `--top` filters for `inspect` to only keep N most active flows/events.
+- Add `--top-events` filters for `inspect` to keep N most relevant events.
