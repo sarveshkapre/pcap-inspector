@@ -37,6 +37,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --t
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --normalize-flows
 # or limit inspection to a time window (epoch seconds):
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --since-ts 1700000000 --until-ts 1700003600
+# or filter to a specific host/port/proto:
+python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.5 --port 443 --proto tcp
 # include per-flow start/end timestamps in flow rows:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
 # stable ordering for diffing:

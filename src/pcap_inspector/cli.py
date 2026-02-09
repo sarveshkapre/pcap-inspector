@@ -24,6 +24,48 @@ def _non_negative_float(value: str) -> float:
     return parsed
 
 
+def _port(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0 or parsed > 65535:
+        raise argparse.ArgumentTypeError("must be in 1..65535")
+    return parsed
+
+
+def _proto(value: str) -> str:
+    parsed = value.strip().upper()
+    if parsed not in {"TCP", "UDP", "IP"}:
+        raise argparse.ArgumentTypeError("must be one of: TCP, UDP, IP")
+    return parsed
+
+
+def _split_csv(values: Sequence[str]) -> list[str]:
+    out: list[str] = []
+    for value in values:
+        for part in value.split(","):
+            part = part.strip()
+            if part:
+                out.append(part)
+    return out
+
+
+def _normalize_hosts(values: Sequence[str]) -> set[str]:
+    out: set[str] = set()
+    for raw in _split_csv(values):
+        raw = raw.strip()
+        if raw.startswith("[") and raw.endswith("]") and len(raw) >= 2:
+            raw = raw[1:-1]
+        if raw:
+            out.add(raw)
+    return out
+
+
+def _normalize_protos(values: Sequence[str]) -> set[str]:
+    out: set[str] = set()
+    for raw in _split_csv(values):
+        out.add(_proto(raw))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
     parser.add_argument("--version", action="version", version="0.1.0")
@@ -84,6 +126,25 @@ def main(argv: list[str] | None = None) -> int:
         help="Only include first N event rows (DNS/HTTP/TLS) in packet order (0 = all events)",
     )
     p_run.add_argument(
+        "--host",
+        action="append",
+        default=[],
+        help="Only include flows where src or dst matches host (repeatable; comma-separated)",
+    )
+    p_run.add_argument(
+        "--port",
+        action="append",
+        default=[],
+        type=_port,
+        help="Only include flows where sport or dport matches port (repeatable)",
+    )
+    p_run.add_argument(
+        "--proto",
+        action="append",
+        default=[],
+        help="Only include flows with protocol (TCP/UDP/IP) (repeatable; comma-separated)",
+    )
+    p_run.add_argument(
         "--since-ts",
         type=_non_negative_float,
         default=None,
@@ -118,6 +179,25 @@ def main(argv: list[str] | None = None) -> int:
     p_summary.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_summary.add_argument(
         "--top", type=_non_negative_int, default=10, help="Number of top items to show"
+    )
+    p_summary.add_argument(
+        "--host",
+        action="append",
+        default=[],
+        help="Only include flows where src or dst matches host (repeatable; comma-separated)",
+    )
+    p_summary.add_argument(
+        "--port",
+        action="append",
+        default=[],
+        type=_port,
+        help="Only include flows where sport or dport matches port (repeatable)",
+    )
+    p_summary.add_argument(
+        "--proto",
+        action="append",
+        default=[],
+        help="Only include flows with protocol (TCP/UDP/IP) (repeatable; comma-separated)",
     )
     p_summary.add_argument(
         "--since-ts",
@@ -168,6 +248,9 @@ def _run(args: argparse.Namespace) -> int:
 
     stats_out = sys.stderr if args.stats or args.stats_json else None
     out_path = Path(args.out)
+    hosts = _normalize_hosts(args.host)
+    ports = set(args.port)
+    protos = _normalize_protos(args.proto)
     rc = inspect_pcap(
         pcap_path,
         out_path,
@@ -179,6 +262,9 @@ def _run(args: argparse.Namespace) -> int:
         top_events=int(args.top_events),
         since_ts=since_ts,
         until_ts=until_ts,
+        hosts=hosts if hosts else None,
+        ports=ports if ports else None,
+        protos=protos if protos else None,
         normalize_flows=bool(args.normalize_flows),
         include_dns=bool(args.include_dns),
         include_http=bool(args.include_http),
@@ -212,6 +298,9 @@ def _summary(args: argparse.Namespace) -> int:
         top_n=int(args.top),
         since_ts=since_ts,
         until_ts=until_ts,
+        hosts=_normalize_hosts(args.host) or None,
+        ports=set(args.port) or None,
+        protos=_normalize_protos(args.proto) or None,
         normalize_flows=bool(args.normalize_flows),
     )
     if args.json:

@@ -378,6 +378,9 @@ def inspect_pcap(
     top_events: int = 0,
     since_ts: float | None = None,
     until_ts: float | None = None,
+    hosts: set[str] | None = None,
+    ports: set[int] | None = None,
+    protos: set[str] | None = None,
     normalize_flows: bool = False,
     include_flow_times: bool = False,
     stats_out: TextIO | None = None,
@@ -407,12 +410,18 @@ def inspect_pcap(
             flow_parts = _extract_flow_parts(pkt)
             if flow_parts is None:
                 continue
+            src, sport, dst, dport, proto = flow_parts
+            if protos is not None and proto not in protos:
+                continue
+            if hosts is not None and src not in hosts and dst not in hosts:
+                continue
+            if ports is not None and sport not in ports and dport not in ports:
+                continue
             if max_packets and packets_seen >= max_packets:
                 break
             packets_seen += 1
             ip_packets += 1
             ip_bytes += len(pkt)
-            src, sport, dst, dport, proto = flow_parts
             stream_key = _flow_key(src, sport, dst, dport, proto)
             key = _flow_key_with_mode(
                 src,
@@ -498,7 +507,7 @@ def inspect_pcap(
             for flow in flow_values:
                 out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
     if stats_out is not None:
-        stats: dict[str, int | str | float | None] = {
+        stats: dict[str, object] = {
             "pcap": str(path),
             "max_packets": max_packets,
             "packets_seen": packets_seen,
@@ -512,6 +521,9 @@ def inspect_pcap(
             "tls_events": tls_events,
             "since_ts": since_ts,
             "until_ts": until_ts,
+            "hosts": sorted(hosts) if hosts else None,
+            "ports": sorted(ports) if ports else None,
+            "protos": sorted(protos) if protos else None,
         }
         if stats_json:
             stats_out.write(json.dumps(stats, indent=2) + "\n")
@@ -520,7 +532,7 @@ def inspect_pcap(
     return 0
 
 
-def _write_stats_text(out: TextIO, stats: dict[str, int | str | float | None]) -> None:
+def _write_stats_text(out: TextIO, stats: dict[str, object]) -> None:
     out.write("Inspect Stats\n")
     out.write(f"PCAP: {stats['pcap']}\n")
     if stats["max_packets"]:
@@ -529,6 +541,18 @@ def _write_stats_text(out: TextIO, stats: dict[str, int | str | float | None]) -
         out.write(f"Max events: {stats['top_events']}\n")
     if stats.get("since_ts") is not None or stats.get("until_ts") is not None:
         out.write(f"Time window: {stats.get('since_ts')}..{stats.get('until_ts')}\n")
+    if (
+        stats.get("hosts") is not None
+        or stats.get("ports") is not None
+        or stats.get("protos") is not None
+    ):
+        out.write(
+            "Flow filters: host={hosts} port={ports} proto={protos}\n".format(
+                hosts=stats.get("hosts"),
+                ports=stats.get("ports"),
+                protos=stats.get("protos"),
+            )
+        )
     out.write(
         "Packets: {packets_seen} (IP: {ip_packets})\n"
         "Flows: {flows}\n"
@@ -547,6 +571,9 @@ def summarize_pcap(
     *,
     since_ts: float | None = None,
     until_ts: float | None = None,
+    hosts: set[str] | None = None,
+    ports: set[int] | None = None,
+    protos: set[str] | None = None,
     normalize_flows: bool = False,
 ) -> dict[str, Any]:
     flows: dict[str, Flow] = {}
@@ -580,6 +607,13 @@ def summarize_pcap(
         flow_parts = _extract_flow_parts(pkt)
         if flow_parts is None:
             continue
+        src, sport, dst, dport, proto = flow_parts
+        if protos is not None and proto not in protos:
+            continue
+        if hosts is not None and src not in hosts and dst not in hosts:
+            continue
+        if ports is not None and sport not in ports and dport not in ports:
+            continue
         if max_packets and packets_seen >= max_packets:
             break
         packets_seen += 1
@@ -591,7 +625,6 @@ def summarize_pcap(
         if last_ts is None or pkt_ts > last_ts:
             last_ts = pkt_ts
 
-        src, sport, dst, dport, proto = flow_parts
         stream_key = _flow_key(src, sport, dst, dport, proto)
         key = _flow_key_with_mode(
             src,
@@ -662,6 +695,9 @@ def summarize_pcap(
             else None,
             "since_ts": since_ts,
             "until_ts": until_ts,
+            "hosts": sorted(hosts) if hosts else None,
+            "ports": sorted(ports) if ports else None,
+            "protos": sorted(protos) if protos else None,
         },
         "top_dns_qnames": _top_named(dns_qnames, top_n),
         "top_tls_sni": _top_named(tls_sni, top_n),

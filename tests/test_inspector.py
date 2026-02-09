@@ -283,6 +283,69 @@ def test_summarize_pcap_time_window_filters_packets(tmp_path: Path) -> None:
     assert totals["last_ts"] == 3.0
 
 
+def test_inspect_pcap_flow_filters_host_port_proto(tmp_path: Path) -> None:
+    dns_pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    http_pkt = (
+        IP(src="2.2.2.2", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pcap = tmp_path / "filters.pcap"
+    wrpcap(str(pcap), [dns_pkt, http_pkt])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_flows=True,
+        include_dns=True,
+        include_http=True,
+        include_tls=False,
+        hosts={"1.1.1.1"},
+        ports={53},
+        protos={"UDP"},
+    )
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert any(r.get("type") == "dns" for r in rows)
+    assert not any(r.get("type") == "http" for r in rows)
+    flow_rows = [r for r in rows if r.get("type") == "flow"]
+    assert len(flow_rows) == 1
+    assert flow_rows[0]["flow"].endswith(" UDP")
+
+
+def test_summarize_pcap_flow_filters_host_port_proto(tmp_path: Path) -> None:
+    dns_pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    http_pkt = (
+        IP(src="2.2.2.2", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pcap = tmp_path / "summary-filters.pcap"
+    wrpcap(str(pcap), [dns_pkt, http_pkt])
+
+    summary = summarize_pcap(
+        pcap,
+        max_packets=0,
+        top_n=10,
+        hosts={"1.1.1.1"},
+        ports={53},
+        protos={"UDP"},
+    )
+    totals = summary["totals"]
+    assert totals["flows"] == 1
+    assert totals["udp_flows"] == 1
+    assert totals["tcp_flows"] == 0
+
+
 def test_summarize_pcap(tmp_path: Path) -> None:
     dns_pkt = (
         IP(src="1.1.1.1", dst="8.8.8.8")
