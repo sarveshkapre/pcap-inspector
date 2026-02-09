@@ -114,3 +114,27 @@
 - Follow-ups:
   - Event-priority mode for `--top-events` beyond packet order.
   - Optional HTTP port filtering to reduce false positives from arbitrary TCP payloads.
+
+## Entry: 2026-02-09-cycle4-event-ranking-http-ports-and-v0-1-2
+- Decision: Add `inspect --top-events-mode flow-bytes` (two-pass, flow-ranked event selection) and add `inspect --http-ports` to reduce false-positive HTTP extraction; bump version/docs to `v0.1.2`.
+- Why: In large captures, “first N events” is often not representative; ranking by highest-byte conversations improves triage value. Port-scoping HTTP detection reduces spurious request/status lines from arbitrary TCP payloads.
+- Evidence:
+  - Code: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`
+  - Tests: `tests/test_inspector.py` (`test_inspect_pcap_top_events_flow_bytes_mode`, `test_inspect_pcap_http_ports_filter`), `tests/test_smoke.py` (`test_top_events_mode_requires_top_events`)
+  - Docs/version: `pyproject.toml`, `README.md`, `PROJECT.md`, `CHANGELOG.md`, `RELEASE.md`, `ROADMAP.md`, `PLAN.md`, `UPDATE.md`, `CLONE_FEATURES.md`
+- Verification Evidence:
+  - `make check` (pass)
+  - Smoke: `.venv/bin/pcap-inspector inspect --pcap bench/fixture-20000p-500f-0b.pcap --out - --no-include-flows --top-events 5 --top-events-mode flow-bytes --http-ports 80,8080 --stats-json` (pass; stats include `top_events_mode: flow-bytes`)
+  - Smoke: `.venv/bin/pcap-inspector timeline --pcap bench/fixture-20000p-500f-0b.pcap --top 3` (pass)
+  - Smoke: `.venv/bin/pcap-inspector schema --summary` (pass)
+- Mistakes And Fixes:
+  - Root cause: `git push` over HTTPS can hang due to global `credential.helper=osxkeychain` in headless automation.
+  - Fix: Use GitHub API (git data endpoints) to advance `refs/heads/main` when git smart-HTTP is unreachable; for normal pushes, prefer `gh auth git-credential` helper overrides.
+  - Prevention rule: In automation, force a non-interactive credential helper and fail fast; if git transport is unreliable, use `gh api` as the fallback path.
+- Commit:
+  - Candidate tasks refresh: `f5492fc9c0a07d26464068ba45bfbf0a243ab794`
+  - Features + tests: `485564bca2bed3ec54b377d1946b28387837c494`
+  - Release/doc alignment (local): `d8c5c249f9ba50ece4fc70e38dff4868d258b47a`
+  - Release/doc alignment (remote, via GitHub API ref update): `1bcfd94c29809e18a4712ca4fbdb6ef86050d7eb`
+- Confidence: High
+- Trust Label: trusted
