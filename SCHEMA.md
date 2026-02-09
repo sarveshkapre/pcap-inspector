@@ -5,7 +5,7 @@
 To get the machine-readable JSON Schema:
 
 ```bash
-python -m pcap_inspector schema > schema.json
+pcap-inspector schema > inspect-jsonl.schema.json
 ```
 
 ## JSONL Record Types (`inspect`)

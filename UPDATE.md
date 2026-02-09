@@ -17,8 +17,8 @@
 
 ```bash
 make check
-python -m pcap_inspector inspect --pcap path/to/capture.pcap --out -
-python -m pcap_inspector summary --pcap path/to/capture.pcap
+.venv/bin/pcap-inspector inspect --pcap path/to/capture.pcap --out -
+.venv/bin/pcap-inspector summary --pcap path/to/capture.pcap
 ```
 
 ## PR
@@ -49,8 +49,8 @@ Do not open PRs for this repo; commit directly to `main`.
 
 ```bash
 make check
-python -m pcap_inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp --stats-json
-python -m pcap_inspector summary --pcap path/to/capture.pcap --json --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp
+.venv/bin/pcap-inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp --stats-json
+.venv/bin/pcap-inspector summary --pcap path/to/capture.pcap --json --normalize-flows --since-ts 1700000000 --until-ts 1700003600 --host 10.0.0.5 --port 443 --proto tcp
 make bench
 make bench-events
 ```

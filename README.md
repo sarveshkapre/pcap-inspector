@@ -24,43 +24,53 @@ make check
 ## Usage
 
 ```bash
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl
 # or stream JSONL to stdout:
-python -m pcap_inspector inspect --pcap capture.pcap --out -
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out -
 # or omit flow summary rows (events-only):
-python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-flows
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --no-include-flows
 # or filter event types:
-python -m pcap_inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
 # or keep only the top 20 flows by bytes in flow rows:
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-flows 20
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-flows 20
 # or emit only the first 200 DNS/HTTP/TLS events:
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-events 200
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-events 200
 # or normalize directional flows into bidirectional conversations:
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --normalize-flows
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --normalize-flows
 # or limit inspection to a time window (epoch seconds):
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --since-ts 1700000000 --until-ts 1700003600
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --since-ts 1700000000 --until-ts 1700003600
 # or filter to a specific host/port/proto:
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.5 --port 443 --proto tcp
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.5 --port 443 --proto tcp
+# or filter to a subnet (CIDR):
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.0/8 --port 443 --proto tcp
 # include per-flow start/end timestamps in flow rows:
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
 # stable ordering for diffing:
-python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --sort-flows
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --sort-flows
 # emit a quick summary to stderr:
-python -m pcap_inspector inspect --pcap capture.pcap --out - --stats
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --stats
 ```
 
 ## Summary
 
 ```bash
-python -m pcap_inspector summary --pcap capture.pcap
-python -m pcap_inspector summary --pcap capture.pcap --json
-python -m pcap_inspector summary --pcap capture.pcap --json --normalize-flows
+.venv/bin/pcap-inspector summary --pcap capture.pcap
+.venv/bin/pcap-inspector summary --pcap capture.pcap --json
+.venv/bin/pcap-inspector summary --pcap capture.pcap --json --normalize-flows
 ```
 
-## JSONL Schema
+## Timeline
 
 ```bash
-python -m pcap_inspector schema > schema.json
+.venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20
+.venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --json
+```
+
+## Schemas
+
+```bash
+.venv/bin/pcap-inspector schema > inspect-jsonl.schema.json
+.venv/bin/pcap-inspector schema --summary > summary.schema.json
 ```
 
 See `SCHEMA.md` for documented fields.
