@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pcap-inspector"
-version = "0.1.2"
+version = "0.1.3"
 description = "Minimal PCAP analyzer that extracts flow summaries and basic DNS/HTTP/TLS metadata."
 readme = "README.md"
 requires-python = ">=3.11"

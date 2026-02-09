@@ -93,7 +93,7 @@ def _normalize_ports_csv(values: Sequence[str]) -> set[int]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
-    parser.add_argument("--version", action="version", version="0.1.2")
+    parser.add_argument("--version", action="version", version="0.1.3")
 
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("inspect", help="Inspect a PCAP file")

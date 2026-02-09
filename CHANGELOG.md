@@ -2,9 +2,13 @@
 
 ## Unreleased
 
-- PCAPNG read support via Scapy `PcapNgReader`.
 - Restricted `--bpf` / `--filter` option for parity with common PCAP tooling.
+
+## v0.1.3 - 2026-02-09
+
+- PCAPNG read support via Scapy `PcapNgReader`.
 - Add `--tls-ports` to scope TLS parsing and reduce false positives.
+- Add `summary/timeline --format text|json` (keep `--json` alias).
 
 ## v0.1.2 - 2026-02-09
 

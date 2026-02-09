@@ -2,6 +2,12 @@
 
 This repo uses SemVer. `v0.x` may include breaking changes.
 
+## v0.1.3 - 2026-02-09
+
+- PCAPNG read support via Scapy `PcapNgReader`.
+- Add `--tls-ports` to scope TLS parsing and reduce false positives.
+- Add `summary/timeline --format text|json` (keep `--json` alias).
+
 ## v0.1.2 - 2026-02-09
 
 - Add `timeline` command (text + `--json`) for compact conversation sequencing.
