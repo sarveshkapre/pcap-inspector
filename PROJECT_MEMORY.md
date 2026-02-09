@@ -7,7 +7,7 @@
   - Code: `src/pcap_inspector/inspector.py`, `src/pcap_inspector/cli.py`
   - Tests: `tests/test_inspector.py`, `tests/test_smoke.py`
   - Verification: `make check`; CLI smoke commands listed in `CLONE_FEATURES.md`
-- Commit: `<pending>`
+- Commit: `3b5fe08c98bf3972d829e02be82d4278a4bb6f22`
 - Confidence: High
 - Trust Label: verified-local
 - Follow-ups:
@@ -20,7 +20,7 @@
 - Evidence:
   - Docs: `README.md`, `PROJECT.md`, `PLAN.md`, `ROADMAP.md`, `SCHEMA.md`, `CHANGELOG.md`, `UPDATE.md`, `CLONE_FEATURES.md`
   - Process records: `PROJECT_MEMORY.md`, `INCIDENTS.md`
-- Commit: `<pending>`
+- Commit: `e87e5709f04bbb30e82d84ee95fc255f21d47289`
 - Confidence: High
 - Trust Label: verified-local
 - Follow-ups:
