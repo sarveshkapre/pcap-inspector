@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import io
 import json
+import logging
 from pathlib import Path
 
-from scapy.all import DNS, DNSQR, IP, IPv6, UDP, wrpcap
-from scapy.all import Raw, TCP
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+logging.getLogger("scapy").setLevel(logging.ERROR)
+
+from scapy.layers.dns import DNS, DNSQR
+from scapy.layers.inet import IP, TCP, UDP
+from scapy.layers.inet6 import IPv6
+from scapy.packet import Raw
+from scapy.utils import wrpcap
 
 from pcap_inspector.inspector import inspect_pcap, summarize_pcap
 
@@ -184,6 +193,31 @@ def test_inspect_pcap_sort_flows(tmp_path: Path) -> None:
     ]
     flows = [row["flow"] for row in flow_rows]
     assert flows == sorted(flows)
+
+
+def test_inspect_pcap_flow_times(tmp_path: Path) -> None:
+    pkt_a = IP(src="1.1.1.1", dst="8.8.8.8") / UDP(sport=1234, dport=53) / Raw(load=b"x")
+    pkt_b = IP(src="1.1.1.1", dst="8.8.8.8") / UDP(sport=1234, dport=53) / Raw(load=b"y")
+    pkt_a.time = 5.0
+    pkt_b.time = 1.0
+    pcap = tmp_path / "flow-times.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_dns=False,
+        include_http=False,
+        include_tls=False,
+        include_flow_times=True,
+    )
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    flow_rows = [r for r in rows if r.get("type") == "flow"]
+    assert len(flow_rows) == 1
+    assert flow_rows[0]["first_ts"] == 1.0
+    assert flow_rows[0]["last_ts"] == 5.0
 
 
 def test_summarize_pcap(tmp_path: Path) -> None:

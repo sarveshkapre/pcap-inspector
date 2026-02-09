@@ -36,6 +36,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --t
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-events 200
 # or normalize directional flows into bidirectional conversations:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --normalize-flows
+# include per-flow start/end timestamps in flow rows:
+python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
 # stable ordering for diffing:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --sort-flows
 # emit a quick summary to stderr:

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Silence noisy Scapy runtime warnings during CLI usage.
+- Improve CLI errors for missing/corrupt PCAP files (no traceback; actionable message).
+- Add `inspect --include-flow-times` to include per-flow `first_ts`/`last_ts` timestamps in flow rows.
 - Improve TCP stream reassembly handling for out-of-order and retransmitted segments.
 - Fix `max_packets` packet accounting in `inspect` and `summary`.
 - Add `inspect --top-flows N` to include only top flow rows by bytes.

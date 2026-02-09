@@ -8,9 +8,15 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P2: Add a small benchmark script/fixture to track `inspect` throughput and memory across releases.
+- [ ] P0 (Selected): Add a small benchmark script + reproducible fixture generator to track `inspect` throughput and memory (RSS) across releases.
+- [ ] P0 (Selected): Silence noisy Scapy runtime warnings during CLI usage to keep outputs clean and grep-able.
+- [ ] P0 (Selected): Improve CLI error handling for missing/corrupt PCAP files (no traceback; non-zero exit; actionable message).
+- [ ] P1 (Selected): Add `inspect --include-flow-times` to include per-flow `first_ts`/`last_ts` fields (foundation for flow timeline work).
+- [ ] P2: Add `--since-ts/--until-ts` filtering to limit `inspect`/`summary` to a timestamp range.
 - [ ] P2: Add event-priority mode (for example rank by flow byte-volume) to complement packet-order `--top-events`.
-- [ ] P3: Add a compact flow timeline output format for quick conversation sequencing.
+- [ ] P2: Add simple flow filtering flags (`--host`, `--port`, `--proto`) for fast triage without post-processing.
+- [ ] P3: Add a compact flow timeline output format for quick conversation sequencing (for example top flows with start/end/duration + event counts).
+- [ ] P3: Improve PCAPNG compatibility story (documented behavior + test fixture; better errors if unsupported).
 
 ## Implemented
 - [x] 2026-02-09 P0: Improved TCP stream reassembly robustness for out-of-order and retransmitted segments.
@@ -49,6 +55,13 @@
 - `--top-flows` is a practical way to control JSONL size for noisy captures without losing event records.
 - `--top-events` now provides independent event-row backpressure for large captures.
 - `--normalize-flows` enables cleaner conversation-centric triage and reduces directional flow duplication in summaries.
+- Market scan (bounded): comparable tools emphasize fast filtering, timelines, and machine-readable exports.
+  Links:
+  - Wireshark/TShark: JSON output formats enable downstream tooling and automation: https://www.wireshark.org/docs/man-pages/tshark.html
+  - Zeek: protocol-aware logs designed for triage at scale (structured logging model): https://docs.zeek.org/en/master/logs/
+  - Arkime: indexing + session timeline UI for browsing large captures: https://arkime.com/
+  - Suricata: produces JSON (EVE) events for alerts/metadata pipelines: https://docs.suricata.io/en/latest/output/eve/eve-json-format.html
+  - Brimcap/Zui: query-centric exploration of PCAP-derived structured data: https://github.com/brimdata/zui
 
 ## Notes
 - This file is maintained by the autonomous clone loop.

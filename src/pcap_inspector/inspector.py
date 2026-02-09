@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
+import logging
 import json
 import sys
 from collections import Counter
@@ -9,7 +12,16 @@ from dataclasses import field
 from pathlib import Path
 from typing import Any, Iterable, TextIO, cast
 
-from scapy.all import DNS, DNSQR, IP, IPv6, TCP, UDP, PcapReader, Raw
+# Scapy emits noisy runtime warnings on some macOS interface configurations.
+# We only use Scapy for offline PCAP parsing, so keep runtime logs quiet by default.
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+logging.getLogger("scapy").setLevel(logging.ERROR)
+
+from scapy.layers.dns import DNS, DNSQR
+from scapy.layers.inet import IP, TCP, UDP
+from scapy.layers.inet6 import IPv6
+from scapy.packet import Raw
+from scapy.utils import PcapReader
 
 _HTTP_METHODS = {
     b"GET",
@@ -29,9 +41,20 @@ class Flow:
     key: str
     packets: int
     bytes: int
+    first_ts: float | None = None
+    last_ts: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"flow": self.key, "packets": self.packets, "bytes": self.bytes}
+        out: dict[str, Any] = {"flow": self.key, "packets": self.packets, "bytes": self.bytes}
+        if self.first_ts is not None:
+            out["first_ts"] = self.first_ts
+        if self.last_ts is not None:
+            out["last_ts"] = self.last_ts
+        return out
+
+
+class PcapInspectorError(RuntimeError):
+    pass
 
 
 def _flow_key(src: str, sport: int, dst: str, dport: int, proto: str) -> str:
@@ -67,9 +90,12 @@ def _fmt_hostport(host: str, port: int) -> str:
 
 
 def _iter_packets(path: Path) -> Iterable[Any]:
-    with PcapReader(str(path)) as reader:
-        for pkt in reader:
-            yield pkt
+    try:
+        with PcapReader(str(path)) as reader:
+            for pkt in reader:
+                yield pkt
+    except Exception as e:  # Scapy throws a variety of exceptions for invalid pcaps.
+        raise PcapInspectorError(f"failed to read pcap: {path}: {e}") from e
 
 
 def _extract_dns(pkt: Any) -> dict[str, Any] | None:
@@ -351,6 +377,7 @@ def inspect_pcap(
     top_flows: int = 0,
     top_events: int = 0,
     normalize_flows: bool = False,
+    include_flow_times: bool = False,
     stats_out: TextIO | None = None,
     stats_json: bool = False,
 ) -> int:
@@ -376,6 +403,7 @@ def inspect_pcap(
             flow_parts = _extract_flow_parts(pkt)
             if flow_parts is None:
                 continue
+            pkt_ts = float(getattr(pkt, "time", 0.0))
             ip_packets += 1
             ip_bytes += len(pkt)
             src, sport, dst, dport, proto = flow_parts
@@ -390,9 +418,27 @@ def inspect_pcap(
             )
             prev = flows.get(key)
             if prev:
-                flows[key] = Flow(key, prev.packets + 1, prev.bytes + len(pkt))
+                if include_flow_times:
+                    first_ts = prev.first_ts
+                    last_ts = prev.last_ts
+                    if first_ts is None or pkt_ts < first_ts:
+                        first_ts = pkt_ts
+                    if last_ts is None or pkt_ts > last_ts:
+                        last_ts = pkt_ts
+                    flows[key] = Flow(
+                        key,
+                        prev.packets + 1,
+                        prev.bytes + len(pkt),
+                        first_ts=first_ts,
+                        last_ts=last_ts,
+                    )
+                else:
+                    flows[key] = Flow(key, prev.packets + 1, prev.bytes + len(pkt))
             else:
-                flows[key] = Flow(key, 1, len(pkt))
+                if include_flow_times:
+                    flows[key] = Flow(key, 1, len(pkt), first_ts=pkt_ts, last_ts=pkt_ts)
+                else:
+                    flows[key] = Flow(key, 1, len(pkt))
 
             if top_events == 0 or events_emitted < top_events:
                 event: dict[str, Any] | None = None
@@ -401,7 +447,7 @@ def inspect_pcap(
                 if event is None and include_http:
                     event = _extract_http(pkt)
                 if event:
-                    event["ts"] = float(getattr(pkt, "time", 0.0))
+                    event["ts"] = pkt_ts
                     event["flow"] = key
                     out.write(json.dumps(event) + "\n")
                     events_emitted += 1
@@ -426,7 +472,7 @@ def inspect_pcap(
                             json.dumps(
                                 {
                                     "type": "tls",
-                                    "ts": float(getattr(pkt, "time", 0.0)),
+                                    "ts": pkt_ts,
                                     "flow": key,
                                     **meta,
                                 }
@@ -445,8 +491,6 @@ def inspect_pcap(
                 flow_values.sort(key=lambda f: f.key)
             for flow in flow_values:
                 out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
-    if not use_stdout:
-        print(f"wrote {out_path}")
     if stats_out is not None:
         stats: dict[str, int | str] = {
             "pcap": str(path),
@@ -499,6 +543,8 @@ def summarize_pcap(
     ip_packets = 0
     ip_bytes = 0
     packets_seen = 0
+    first_ts: float | None = None
+    last_ts: float | None = None
 
     dns_qnames: Counter[str] = Counter()
     tls_sni: Counter[str] = Counter()
@@ -523,6 +569,11 @@ def summarize_pcap(
 
         ip_packets += 1
         ip_bytes += len(pkt)
+        pkt_ts = float(getattr(pkt, "time", 0.0))
+        if first_ts is None or pkt_ts < first_ts:
+            first_ts = pkt_ts
+        if last_ts is None or pkt_ts > last_ts:
+            last_ts = pkt_ts
 
         src, sport, dst, dport, proto = flow_parts
         stream_key = _flow_key(src, sport, dst, dport, proto)
@@ -588,6 +639,11 @@ def summarize_pcap(
             "http_requests": http_requests,
             "http_responses": http_responses,
             "tls_client_hellos": tls_client_hellos,
+            "first_ts": first_ts,
+            "last_ts": last_ts,
+            "duration_s": (last_ts - first_ts)
+            if first_ts is not None and last_ts is not None
+            else None,
         },
         "top_dns_qnames": _top_named(dns_qnames, top_n),
         "top_tls_sni": _top_named(tls_sni, top_n),

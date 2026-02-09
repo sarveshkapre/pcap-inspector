@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .inspector import inspect_pcap, summarize_pcap
+from .inspector import PcapInspectorError, inspect_pcap, summarize_pcap
 from .schema import JSONL_SCHEMA
 
 
@@ -33,6 +33,12 @@ def main(argv: list[str] | None = None) -> int:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Include flow summary rows in JSONL output",
+    )
+    p_run.add_argument(
+        "--include-flow-times",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Include per-flow first_ts/last_ts timestamps in flow rows",
     )
     p_run.add_argument(
         "--include-dns",
@@ -107,16 +113,30 @@ def main(argv: list[str] | None = None) -> int:
     p_schema.set_defaults(func=_schema)
 
     args = parser.parse_args(argv)
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except PcapInspectorError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return 2
 
 
 def _run(args: argparse.Namespace) -> int:
+    pcap_path = Path(args.pcap)
+    if not pcap_path.exists():
+        sys.stderr.write(f"error: pcap not found: {pcap_path}\n")
+        return 2
+    if not pcap_path.is_file():
+        sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
+        return 2
+
     stats_out = sys.stderr if args.stats or args.stats_json else None
-    return inspect_pcap(
-        Path(args.pcap),
-        Path(args.out),
+    out_path = Path(args.out)
+    rc = inspect_pcap(
+        pcap_path,
+        out_path,
         int(args.max_packets),
         include_flows=bool(args.include_flows),
+        include_flow_times=bool(args.include_flow_times),
         sort_flows=bool(args.sort_flows),
         top_flows=int(args.top_flows),
         top_events=int(args.top_events),
@@ -127,11 +147,22 @@ def _run(args: argparse.Namespace) -> int:
         stats_out=stats_out,
         stats_json=bool(args.stats_json),
     )
+    if out_path.as_posix() != "-":
+        sys.stdout.write(f"wrote {out_path}\n")
+    return rc
 
 
 def _summary(args: argparse.Namespace) -> int:
+    pcap_path = Path(args.pcap)
+    if not pcap_path.exists():
+        sys.stderr.write(f"error: pcap not found: {pcap_path}\n")
+        return 2
+    if not pcap_path.is_file():
+        sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
+        return 2
+
     summary = summarize_pcap(
-        Path(args.pcap),
+        pcap_path,
         max_packets=int(args.max_packets),
         top_n=int(args.top),
         normalize_flows=bool(args.normalize_flows),

@@ -16,6 +16,8 @@ JSONL_SCHEMA: dict[str, Any] = {
                 "flow": {"type": "string"},
                 "packets": {"type": "integer", "minimum": 0},
                 "bytes": {"type": "integer", "minimum": 0},
+                "first_ts": {"type": "number"},
+                "last_ts": {"type": "number"},
             },
             "additionalProperties": True,
         },
