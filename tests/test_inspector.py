@@ -15,7 +15,7 @@ from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.inet import IP, TCP, UDP
 from scapy.layers.inet6 import IPv6
 from scapy.packet import Raw
-from scapy.utils import wrpcap
+from scapy.utils import PcapNgWriter, wrpcap
 
 from pcap_inspector.inspector import inspect_pcap, summarize_pcap, timeline_pcap
 
@@ -61,6 +61,22 @@ def test_inspect_pcap(tmp_path: Path) -> None:
     lines = out.read_text(encoding="utf-8").splitlines()
     assert any(json.loads(line).get("type") == "dns" for line in lines)
     assert any("ts" in json.loads(line) for line in lines)
+
+
+def test_inspect_pcap_reads_pcapng(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    pcapng = tmp_path / "test.pcapng"
+    with PcapNgWriter(str(pcapng)) as writer:
+        writer.write(pkt)
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcapng, out, max_packets=0)
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert any(json.loads(line).get("type") == "dns" for line in lines)
 
 
 def test_inspect_pcap_extracts_tls_sni(tmp_path: Path) -> None:

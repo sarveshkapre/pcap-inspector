@@ -23,7 +23,7 @@ from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.inet import IP, TCP, UDP
 from scapy.layers.inet6 import IPv6
 from scapy.packet import Raw
-from scapy.utils import PcapReader
+from scapy.utils import PcapNgReader, PcapReader
 
 _HTTP_METHODS = {
     b"GET",
@@ -133,13 +133,17 @@ def _fmt_hostport(host: str, port: int) -> str:
 def _iter_packets(path: Path) -> Iterable[Any]:
     kind = _pcap_kind(path)
     try:
-        with PcapReader(str(path)) as reader:
+        if kind == "pcapng":
+            reader_ctx = PcapNgReader(str(path))
+        else:
+            reader_ctx = PcapReader(str(path))
+        with reader_ctx as reader:
             for pkt in reader:
                 yield pkt
     except Exception as e:  # Scapy throws a variety of exceptions for invalid pcaps.
         if kind == "pcapng":
             raise PcapInspectorError(
-                f"failed to read pcapng: {path}: {e} (pcapng may be unsupported; try converting to .pcap)"
+                f"failed to read pcapng: {path}: {e} (try converting to .pcap)"
             ) from e
         if kind == "unknown":
             raise PcapInspectorError(

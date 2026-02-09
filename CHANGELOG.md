@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- PCAPNG support (if feasible) via an alternate reader or conversion fallback.
+- PCAPNG read support via Scapy `PcapNgReader`.
 - Restricted `--bpf` / `--filter` option for parity with common PCAP tooling.
 - Optional TLS port filtering (`--tls-ports`) to reduce false positives.
 
