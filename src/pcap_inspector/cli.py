@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import ipaddress
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -48,13 +49,30 @@ def _split_csv(values: Sequence[str]) -> list[str]:
     return out
 
 
-def _normalize_hosts(values: Sequence[str]) -> set[str]:
+def _normalize_host_nets(
+    values: Sequence[str],
+) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+    nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for raw in _split_csv(values):
+        raw = raw.strip()
+        if raw.startswith("[") and raw.endswith("]") and len(raw) >= 2:
+            raw = raw[1:-1]
+        if not raw or "/" not in raw:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(raw, strict=False))
+        except ValueError as e:
+            raise PcapInspectorError(f"invalid --host CIDR '{raw}': {e}") from e
+    return nets
+
+
+def _normalize_host_exact(values: Sequence[str]) -> set[str]:
     out: set[str] = set()
     for raw in _split_csv(values):
         raw = raw.strip()
         if raw.startswith("[") and raw.endswith("]") and len(raw) >= 2:
             raw = raw[1:-1]
-        if raw:
+        if raw and "/" not in raw:
             out.add(raw)
     return out
 
@@ -129,7 +147,10 @@ def main(argv: list[str] | None = None) -> int:
         "--host",
         action="append",
         default=[],
-        help="Only include flows where src or dst matches host (repeatable; comma-separated)",
+        help=(
+            "Only include flows where src or dst matches host or CIDR "
+            "(repeatable; comma-separated; examples: 10.0.0.5, 10.0.0.0/8, 2001:db8::/32)"
+        ),
     )
     p_run.add_argument(
         "--port",
@@ -184,7 +205,10 @@ def main(argv: list[str] | None = None) -> int:
         "--host",
         action="append",
         default=[],
-        help="Only include flows where src or dst matches host (repeatable; comma-separated)",
+        help=(
+            "Only include flows where src or dst matches host or CIDR "
+            "(repeatable; comma-separated; examples: 10.0.0.5, 10.0.0.0/8, 2001:db8::/32)"
+        ),
     )
     p_summary.add_argument(
         "--port",
@@ -248,7 +272,8 @@ def _run(args: argparse.Namespace) -> int:
 
     stats_out = sys.stderr if args.stats or args.stats_json else None
     out_path = Path(args.out)
-    hosts = _normalize_hosts(args.host)
+    hosts = _normalize_host_exact(args.host)
+    host_nets = _normalize_host_nets(args.host)
     ports = set(args.port)
     protos = _normalize_protos(args.proto)
     rc = inspect_pcap(
@@ -263,6 +288,7 @@ def _run(args: argparse.Namespace) -> int:
         since_ts=since_ts,
         until_ts=until_ts,
         hosts=hosts if hosts else None,
+        host_nets=host_nets if host_nets else None,
         ports=ports if ports else None,
         protos=protos if protos else None,
         normalize_flows=bool(args.normalize_flows),
@@ -298,7 +324,8 @@ def _summary(args: argparse.Namespace) -> int:
         top_n=int(args.top),
         since_ts=since_ts,
         until_ts=until_ts,
-        hosts=_normalize_hosts(args.host) or None,
+        hosts=_normalize_host_exact(args.host) or None,
+        host_nets=_normalize_host_nets(args.host) or None,
         ports=set(args.port) or None,
         protos=_normalize_protos(args.proto) or None,
         normalize_flows=bool(args.normalize_flows),

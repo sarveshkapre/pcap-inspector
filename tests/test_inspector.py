@@ -3,6 +3,7 @@ from __future__ import annotations
 # ruff: noqa: E402
 
 import io
+import ipaddress
 import json
 import logging
 from pathlib import Path
@@ -344,6 +345,62 @@ def test_summarize_pcap_flow_filters_host_port_proto(tmp_path: Path) -> None:
     assert totals["flows"] == 1
     assert totals["udp_flows"] == 1
     assert totals["tcp_flows"] == 0
+
+
+def test_inspect_pcap_host_cidr_filter_ipv4(tmp_path: Path) -> None:
+    pkt_in = (
+        IP(src="10.0.0.5", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="in.example"))
+    )
+    pkt_out = (
+        IP(src="10.1.0.5", dst="8.8.8.8")
+        / UDP(sport=2222, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="out.example"))
+    )
+    pcap = tmp_path / "cidr-v4.pcap"
+    wrpcap(str(pcap), [pkt_in, pkt_out])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_flows=True,
+        include_dns=True,
+        include_http=False,
+        include_tls=False,
+        host_nets=[ipaddress.ip_network("10.0.0.0/16")],
+    )
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    dns_rows = [r for r in rows if r.get("type") == "dns"]
+    assert len(dns_rows) == 1
+    assert dns_rows[0]["qname"] == "in.example"
+
+
+def test_summarize_pcap_host_cidr_filter_ipv6(tmp_path: Path) -> None:
+    pkt_in = (
+        IPv6(src="2001:db8::1", dst="2001:db8::2")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="in.example"))
+    )
+    pkt_out = (
+        IPv6(src="2001:db9::1", dst="2001:db9::2")
+        / UDP(sport=2222, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="out.example"))
+    )
+    pcap = tmp_path / "cidr-v6.pcap"
+    wrpcap(str(pcap), [pkt_in, pkt_out])
+
+    summary = summarize_pcap(
+        pcap,
+        max_packets=0,
+        top_n=10,
+        host_nets=[ipaddress.ip_network("2001:db8::/32")],
+    )
+    totals = summary["totals"]
+    assert totals["flows"] == 1
+    assert totals["dns_queries"] == 1
 
 
 def test_summarize_pcap(tmp_path: Path) -> None:

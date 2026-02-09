@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import json
 import sys
+import ipaddress
 from collections import Counter
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -410,6 +411,7 @@ def inspect_pcap(
     since_ts: float | None = None,
     until_ts: float | None = None,
     hosts: set[str] | None = None,
+    host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
     normalize_flows: bool = False,
@@ -444,7 +446,9 @@ def inspect_pcap(
             src, sport, dst, dport, proto = flow_parts
             if protos is not None and proto not in protos:
                 continue
-            if hosts is not None and src not in hosts and dst not in hosts:
+            if (hosts is not None or host_nets is not None) and not _host_matches(
+                src, dst, hosts, host_nets
+            ):
                 continue
             if ports is not None and sport not in ports and dport not in ports:
                 continue
@@ -553,6 +557,7 @@ def inspect_pcap(
             "since_ts": since_ts,
             "until_ts": until_ts,
             "hosts": sorted(hosts) if hosts else None,
+            "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
         }
@@ -603,6 +608,7 @@ def summarize_pcap(
     since_ts: float | None = None,
     until_ts: float | None = None,
     hosts: set[str] | None = None,
+    host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
     normalize_flows: bool = False,
@@ -641,7 +647,9 @@ def summarize_pcap(
         src, sport, dst, dport, proto = flow_parts
         if protos is not None and proto not in protos:
             continue
-        if hosts is not None and src not in hosts and dst not in hosts:
+        if (hosts is not None or host_nets is not None) and not _host_matches(
+            src, dst, hosts, host_nets
+        ):
             continue
         if ports is not None and sport not in ports and dport not in ports:
             continue
@@ -727,6 +735,7 @@ def summarize_pcap(
             "since_ts": since_ts,
             "until_ts": until_ts,
             "hosts": sorted(hosts) if hosts else None,
+            "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
         },
@@ -736,6 +745,32 @@ def summarize_pcap(
         "http_status_codes": dict(http_status_codes),
         "top_flows_by_bytes": _top_flows_by_bytes(flows, top_n),
     }
+
+
+def _host_matches(
+    src: str,
+    dst: str,
+    hosts: set[str] | None,
+    host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None,
+) -> bool:
+    if hosts and (src in hosts or dst in hosts):
+        return True
+    if not host_nets:
+        return False
+    try:
+        src_ip = ipaddress.ip_address(src)
+    except ValueError:
+        src_ip = None
+    try:
+        dst_ip = ipaddress.ip_address(dst)
+    except ValueError:
+        dst_ip = None
+    if src_ip is None and dst_ip is None:
+        return False
+    for net in host_nets:
+        if (src_ip is not None and src_ip in net) or (dst_ip is not None and dst_ip in net):
+            return True
+    return False
 
 
 def _top_named(counter: Counter[str], top_n: int) -> list[dict[str, object]]:
