@@ -75,3 +75,93 @@ JSONL_SCHEMA: dict[str, Any] = {
     ],
     "additionalProperties": True,
 }
+
+SUMMARY_JSON_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "pcap-inspector summary JSON",
+    "type": "object",
+    "required": [
+        "pcap",
+        "totals",
+        "top_dns_qnames",
+        "top_tls_sni",
+        "http_methods",
+        "http_status_codes",
+        "top_flows_by_bytes",
+    ],
+    "properties": {
+        "pcap": {"type": "string"},
+        "totals": {
+            "type": "object",
+            "required": ["packets_seen", "max_packets", "ip_packets", "ip_bytes", "flows"],
+            "properties": {
+                "packets_seen": {"type": "integer", "minimum": 0},
+                "max_packets": {"type": "integer", "minimum": 0},
+                "ip_packets": {"type": "integer", "minimum": 0},
+                "ip_bytes": {"type": "integer", "minimum": 0},
+                "flows": {"type": "integer", "minimum": 0},
+                "tcp_flows": {"type": "integer", "minimum": 0},
+                "udp_flows": {"type": "integer", "minimum": 0},
+                "dns_queries": {"type": "integer", "minimum": 0},
+                "http_requests": {"type": "integer", "minimum": 0},
+                "http_responses": {"type": "integer", "minimum": 0},
+                "tls_client_hellos": {"type": "integer", "minimum": 0},
+                "first_ts": {"type": ["number", "null"]},
+                "last_ts": {"type": ["number", "null"]},
+                "duration_s": {"type": ["number", "null"]},
+                "since_ts": {"type": ["number", "null"]},
+                "until_ts": {"type": ["number", "null"]},
+                "hosts": {"type": ["array", "null"], "items": {"type": "string"}},
+                "host_nets": {"type": ["array", "null"], "items": {"type": "string"}},
+                "ports": {"type": ["array", "null"], "items": {"type": "integer", "minimum": 0}},
+                "protos": {"type": ["array", "null"], "items": {"type": "string"}},
+            },
+            "additionalProperties": True,
+        },
+        "top_dns_qnames": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "count"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "count": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": True,
+            },
+        },
+        "top_tls_sni": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "count"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "count": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": True,
+            },
+        },
+        "http_methods": {
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0},
+        },
+        "http_status_codes": {
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0},
+        },
+        "top_flows_by_bytes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "count"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "count": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": True,
+            },
+        },
+    },
+    "additionalProperties": True,
+}

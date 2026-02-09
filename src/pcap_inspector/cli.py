@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .inspector import PcapInspectorError, inspect_pcap, summarize_pcap
-from .schema import JSONL_SCHEMA
+from .schema import JSONL_SCHEMA, SUMMARY_JSON_SCHEMA
 
 
 def _non_negative_int(value: str) -> int:
@@ -244,7 +244,10 @@ def main(argv: list[str] | None = None) -> int:
     p_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     p_summary.set_defaults(func=_summary)
 
-    p_schema = sub.add_parser("schema", help="Print JSON Schema for JSONL records")
+    p_schema = sub.add_parser("schema", help="Print JSON Schema for JSON output formats")
+    p_schema.add_argument(
+        "--summary", action="store_true", help="Print schema for `summary --json`"
+    )
     p_schema.set_defaults(func=_schema)
 
     args = parser.parse_args(argv)
@@ -371,8 +374,9 @@ def _write_kv_list(title: str, mapping: dict[str, int]) -> None:
         sys.stdout.write(f"  {key:<8} {mapping[key]}\n")
 
 
-def _schema(_: argparse.Namespace) -> int:
-    sys.stdout.write(json.dumps(JSONL_SCHEMA, indent=2, sort_keys=True) + "\n")
+def _schema(args: argparse.Namespace) -> int:
+    schema = SUMMARY_JSON_SCHEMA if args.summary else JSONL_SCHEMA
+    sys.stdout.write(json.dumps(schema, indent=2, sort_keys=True) + "\n")
     return 0
 
 

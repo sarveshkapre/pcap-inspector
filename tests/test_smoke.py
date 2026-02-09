@@ -15,6 +15,17 @@ def test_schema() -> None:
     assert proc.returncode == 0
 
 
+def test_summary_schema() -> None:
+    proc = subprocess.run(
+        [sys.executable, "-m", "pcap_inspector", "schema", "--summary"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0
+    assert '"title"' in (proc.stdout or "")
+
+
 def test_invalid_negative_numeric_arg() -> None:
     proc = subprocess.run(
         [

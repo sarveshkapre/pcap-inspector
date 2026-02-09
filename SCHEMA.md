@@ -8,7 +8,7 @@ To get the machine-readable JSON Schema:
 python -m pcap_inspector schema > schema.json
 ```
 
-## Record Types
+## JSONL Record Types (`inspect`)
 
 All records include a `type` field.
 
@@ -52,3 +52,13 @@ Best-effort TLS ClientHello parsing from TCP streams.
 - `flow`: string
 - `sni`: string (if present)
 - `alpn`: string[] (if present)
+
+## Summary JSON Schema (`summary --json`)
+
+`summary --json` emits a single JSON object (not JSONL).
+
+To get the machine-readable JSON Schema:
+
+```bash
+pcap-inspector schema --summary > summary.schema.json
+```
