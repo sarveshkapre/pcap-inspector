@@ -10,6 +10,13 @@ from .inspector import inspect_pcap, summarize_pcap
 from .schema import JSONL_SCHEMA
 
 
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be >= 0")
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
     parser.add_argument("--version", action="version", version="0.1.0")
@@ -20,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument(
         "--out", default="pcap-report.jsonl", help="Output path (.jsonl) or '-' for stdout"
     )
-    p_run.add_argument("--max-packets", type=int, default=0, help="0 = no limit")
+    p_run.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_run.add_argument(
         "--include-flows",
         action=argparse.BooleanOptionalAction,
@@ -52,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Sort flow summary rows by flow key",
     )
     p_run.add_argument(
+        "--top-flows",
+        type=_non_negative_int,
+        default=0,
+        help="Only include top N flow rows by bytes (0 = all flows)",
+    )
+    p_run.add_argument(
         "--stats",
         action="store_true",
         help="Write a short summary to stderr after inspection",
@@ -65,8 +78,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
     p_summary.add_argument("--pcap", required=True, help="Path to .pcap file")
-    p_summary.add_argument("--max-packets", type=int, default=0, help="0 = no limit")
-    p_summary.add_argument("--top", type=int, default=10, help="Number of top items to show")
+    p_summary.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
+    p_summary.add_argument(
+        "--top", type=_non_negative_int, default=10, help="Number of top items to show"
+    )
     p_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     p_summary.set_defaults(func=_summary)
 
@@ -85,6 +100,7 @@ def _run(args: argparse.Namespace) -> int:
         int(args.max_packets),
         include_flows=bool(args.include_flows),
         sort_flows=bool(args.sort_flows),
+        top_flows=int(args.top_flows),
         include_dns=bool(args.include_dns),
         include_http=bool(args.include_http),
         include_tls=bool(args.include_tls),

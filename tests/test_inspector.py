@@ -68,6 +68,28 @@ def test_inspect_pcap_extracts_tls_sni(tmp_path: Path) -> None:
     assert any(e.get("type") == "tls" and e.get("sni") == "example.com" for e in events)
 
 
+def test_inspect_pcap_extracts_tls_sni_out_of_order(tmp_path: Path) -> None:
+    hello = _tls_client_hello_record(sni="example.com")
+    split = 20
+    pkt_second = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=443, seq=100 + split)
+        / Raw(load=hello[split:])
+    )
+    pkt_first = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=443, seq=100)
+        / Raw(load=hello[:split])
+    )
+    pcap = tmp_path / "tls-out-of-order.pcap"
+    wrpcap(str(pcap), [pkt_second, pkt_first])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0)
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert any(e.get("type") == "tls" and e.get("sni") == "example.com" for e in events)
+
+
 def test_inspect_pcap_ipv6_flow_keys(tmp_path: Path) -> None:
     pkt = (
         IPv6(src="2001:db8::1", dst="2001:db8::2")
@@ -183,6 +205,97 @@ def test_summarize_pcap(tmp_path: Path) -> None:
     assert totals["flows"] == 2
     assert totals["dns_queries"] == 1
     assert totals["http_requests"] == 1
+
+
+def test_inspect_pcap_http_put_method(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"PUT /resource HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pcap = tmp_path / "http-put.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0, include_flows=False)
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert any(
+        e.get("type") == "http" and "PUT /resource HTTP/1.1" in e.get("request_line", "")
+        for e in events
+    )
+
+
+def test_inspect_pcap_max_packets_stats_json(tmp_path: Path) -> None:
+    pkt_a = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    pkt_b = (
+        IP(src="1.1.1.2", dst="8.8.8.8")
+        / UDP(sport=1235, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="b.example"))
+    )
+    pcap = tmp_path / "max-packets.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b])
+
+    out = tmp_path / "out.jsonl"
+    stats_out = io.StringIO()
+    inspect_pcap(pcap, out, max_packets=1, stats_out=stats_out, stats_json=True)
+    stats = json.loads(stats_out.getvalue())
+    assert stats["packets_seen"] == 1
+    assert stats["flows"] == 1
+
+
+def test_summarize_pcap_max_packets_counts_processed_only(tmp_path: Path) -> None:
+    pkt_a = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    pkt_b = (
+        IP(src="1.1.1.2", dst="8.8.8.8")
+        / UDP(sport=1235, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="b.example"))
+    )
+    pcap = tmp_path / "summary-max-packets.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b])
+
+    summary = summarize_pcap(pcap, max_packets=1, top_n=10)
+    assert summary["totals"]["packets_seen"] == 1
+    assert summary["totals"]["flows"] == 1
+
+
+def test_inspect_pcap_top_flows(tmp_path: Path) -> None:
+    pkt_small = (
+        IP(src="10.0.0.1", dst="8.8.8.8") / UDP(sport=1000, dport=9999) / Raw(load=b"x" * 10)
+    )
+    pkt_medium = (
+        IP(src="10.0.0.2", dst="8.8.8.8") / UDP(sport=1001, dport=9999) / Raw(load=b"x" * 40)
+    )
+    pkt_large = (
+        IP(src="10.0.0.3", dst="8.8.8.8") / UDP(sport=1002, dport=9999) / Raw(load=b"x" * 70)
+    )
+    pcap = tmp_path / "top-flows.pcap"
+    wrpcap(str(pcap), [pkt_small, pkt_medium, pkt_large])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_dns=False,
+        include_http=False,
+        include_tls=False,
+        top_flows=2,
+    )
+    flow_rows = [
+        json.loads(line)
+        for line in out.read_text(encoding="utf-8").splitlines()
+        if json.loads(line).get("type") == "flow"
+    ]
+    assert len(flow_rows) == 2
+    assert all(row["flow"] != "10.0.0.1:1000->8.8.8.8:9999 UDP" for row in flow_rows)
 
 
 def test_inspect_pcap_stats_json(tmp_path: Path) -> None:

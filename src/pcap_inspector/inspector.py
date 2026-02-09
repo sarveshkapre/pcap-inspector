@@ -11,6 +11,18 @@ from typing import Any, Iterable, TextIO, cast
 
 from scapy.all import DNS, DNSQR, IP, IPv6, TCP, UDP, PcapReader, Raw
 
+_HTTP_METHODS = {
+    b"GET",
+    b"POST",
+    b"PUT",
+    b"DELETE",
+    b"HEAD",
+    b"OPTIONS",
+    b"PATCH",
+    b"CONNECT",
+    b"TRACE",
+}
+
 
 @dataclass(frozen=True)
 class Flow:
@@ -51,25 +63,28 @@ def _extract_dns(pkt: Any) -> dict[str, Any] | None:
 def _extract_http(pkt: Any) -> dict[str, Any] | None:
     if not pkt.haslayer(Raw):
         return None
-    payload = bytes(pkt[Raw].load)
-    if payload.startswith(b"GET ") or payload.startswith(b"POST "):
-        try:
-            line = payload.split(b"\r\n", 1)[0].decode("iso-8859-1")
-        except UnicodeDecodeError:
-            return None
-        return {"type": "http", "request_line": line}
-    if payload.startswith(b"HTTP/"):
-        try:
-            line = payload.split(b"\r\n", 1)[0].decode("iso-8859-1")
-        except UnicodeDecodeError:
-            return None
+    first_line = bytes(pkt[Raw].load).split(b"\r\n", 1)[0]
+    try:
+        line = first_line.decode("iso-8859-1")
+    except UnicodeDecodeError:
+        return None
+    if first_line.startswith(b"HTTP/"):
         return {"type": "http", "status_line": line}
+
+    parts = first_line.split(b" ", 2)
+    if len(parts) < 3:
+        return None
+    method = parts[0].upper()
+    if method in _HTTP_METHODS and parts[2].startswith(b"HTTP/"):
+        return {"type": "http", "request_line": line}
     return None
 
 
 @dataclass(slots=True)
 class _TcpStream:
     max_bytes: int = 256 * 1024
+    max_gap: int = 512 * 1024
+    max_buffered_bytes: int = 512 * 1024
     base_seq: int | None = None
     next_seq: int | None = None
     assembled: bytearray = field(default_factory=bytearray)
@@ -79,35 +94,68 @@ class _TcpStream:
     def push(self, seq: int, payload: bytes) -> None:
         if self.extracted or not payload:
             return
-        if self.base_seq is None:
-            self.base_seq = seq
-            self.next_seq = seq
-        self.segments[seq] = payload
-        self._drain()
+        existing = self.segments.get(seq)
+        if existing is None or len(payload) > len(existing):
+            self.segments[seq] = payload
+        self._prune_segments()
+        self._rebuild()
 
-    def _drain(self) -> None:
-        if self.next_seq is None:
+    def _prune_segments(self) -> None:
+        if not self.segments:
             return
-        while len(self.assembled) < self.max_bytes:
-            limit = self.max_bytes - len(self.assembled)
-            candidate: tuple[int, bytes] | None = None
+        start = min(self.segments)
+        max_seq = start + self.max_gap
+        for seg_seq in list(self.segments):
+            if seg_seq > max_seq:
+                del self.segments[seg_seq]
+
+        total = sum(len(seg_payload) for seg_payload in self.segments.values())
+        if total <= self.max_buffered_bytes:
+            return
+        for seg_seq in sorted(self.segments, reverse=True):
+            if total <= self.max_buffered_bytes:
+                break
+            total -= len(self.segments[seg_seq])
+            del self.segments[seg_seq]
+
+    def _rebuild(self) -> None:
+        if not self.segments:
+            self.base_seq = None
+            self.next_seq = None
+            self.assembled.clear()
+            return
+
+        start = min(self.segments)
+        self.base_seq = start
+        self.next_seq = start
+        self.assembled.clear()
+
+        consumed: set[int] = set()
+        while self.next_seq is not None and len(self.assembled) < self.max_bytes:
+            candidate_seq: int | None = None
+            candidate_payload: bytes | None = None
             for seg_seq, seg_payload in self.segments.items():
+                if seg_seq in consumed:
+                    continue
                 seg_end = seg_seq + len(seg_payload)
                 if seg_seq <= self.next_seq < seg_end:
-                    if candidate is None or seg_seq < candidate[0]:
-                        candidate = (seg_seq, seg_payload)
-            if candidate is None:
+                    if candidate_seq is None or seg_seq < candidate_seq:
+                        candidate_seq = seg_seq
+                        candidate_payload = seg_payload
+            if candidate_seq is None or candidate_payload is None:
                 return
-            seg_seq, seg_payload = candidate
-            del self.segments[seg_seq]
-            if self.next_seq > seg_seq:
-                seg_payload = seg_payload[self.next_seq - seg_seq :]
-            if not seg_payload:
+
+            consumed.add(candidate_seq)
+            if self.next_seq > candidate_seq:
+                candidate_payload = candidate_payload[self.next_seq - candidate_seq :]
+            if not candidate_payload:
                 continue
-            take = seg_payload[:limit]
+
+            limit = self.max_bytes - len(self.assembled)
+            take = candidate_payload[:limit]
             self.assembled.extend(take)
             self.next_seq += len(take)
-            if len(take) < len(seg_payload):
+            if len(take) < len(candidate_payload):
                 return
 
 
@@ -256,6 +304,7 @@ def inspect_pcap(
     include_dns: bool = True,
     include_http: bool = True,
     include_tls: bool = True,
+    top_flows: int = 0,
     stats_out: TextIO | None = None,
     stats_json: bool = False,
 ) -> int:
@@ -264,7 +313,6 @@ def inspect_pcap(
     use_stdout = out_path.as_posix() == "-"
     if not use_stdout:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-    count = 0
     packets_seen = 0
     ip_packets = 0
     ip_bytes = 0
@@ -275,10 +323,9 @@ def inspect_pcap(
     with out_ctx as out:
         out = cast(TextIO, out)
         for pkt in _iter_packets(path):
-            count += 1
-            packets_seen += 1
-            if max_packets and count > max_packets:
+            if max_packets and packets_seen >= max_packets:
                 break
+            packets_seen += 1
             if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
                 continue
             ip_packets += 1
@@ -343,6 +390,8 @@ def inspect_pcap(
 
         if include_flows:
             flow_values = list(flows.values())
+            if top_flows > 0:
+                flow_values = sorted(flow_values, key=lambda f: (-f.bytes, f.key))[:top_flows]
             if sort_flows:
                 flow_values.sort(key=lambda f: f.key)
             for flow in flow_values:
@@ -404,9 +453,9 @@ def summarize_pcap(path: Path, max_packets: int, top_n: int = 10) -> dict[str, A
     udp_flow_keys: set[str] = set()
 
     for pkt in _iter_packets(path):
-        packets_seen += 1
-        if max_packets and packets_seen > max_packets:
+        if max_packets and packets_seen >= max_packets:
             break
+        packets_seen += 1
 
         if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
             continue
