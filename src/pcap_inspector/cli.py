@@ -7,7 +7,7 @@ import ipaddress
 from collections.abc import Sequence
 from pathlib import Path
 
-from .inspector import PcapInspectorError, inspect_pcap, summarize_pcap
+from .inspector import PcapInspectorError, inspect_pcap, summarize_pcap, timeline_pcap
 from .schema import JSONL_SCHEMA, SUMMARY_JSON_SCHEMA
 
 
@@ -250,6 +250,57 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_schema.set_defaults(func=_schema)
 
+    p_timeline = sub.add_parser(
+        "timeline", help="Print a compact conversation timeline for top flows"
+    )
+    p_timeline.add_argument("--pcap", required=True, help="Path to .pcap file")
+    p_timeline.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
+    p_timeline.add_argument(
+        "--top", type=_non_negative_int, default=20, help="Number of flows to show (0 = all)"
+    )
+    p_timeline.add_argument(
+        "--host",
+        action="append",
+        default=[],
+        help=(
+            "Only include flows where src or dst matches host or CIDR "
+            "(repeatable; comma-separated; examples: 10.0.0.5, 10.0.0.0/8, 2001:db8::/32)"
+        ),
+    )
+    p_timeline.add_argument(
+        "--port",
+        action="append",
+        default=[],
+        type=_port,
+        help="Only include flows where sport or dport matches port (repeatable)",
+    )
+    p_timeline.add_argument(
+        "--proto",
+        action="append",
+        default=[],
+        help="Only include flows with protocol (TCP/UDP/IP) (repeatable; comma-separated)",
+    )
+    p_timeline.add_argument(
+        "--since-ts",
+        type=_non_negative_float,
+        default=None,
+        help="Only process packets with ts >= since-ts (seconds since epoch)",
+    )
+    p_timeline.add_argument(
+        "--until-ts",
+        type=_non_negative_float,
+        default=None,
+        help="Only process packets with ts <= until-ts (seconds since epoch)",
+    )
+    p_timeline.add_argument(
+        "--normalize-flows",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Normalize bidirectional flow keys as A:port<->B:port",
+    )
+    p_timeline.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    p_timeline.set_defaults(func=_timeline)
+
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
@@ -377,6 +428,100 @@ def _write_kv_list(title: str, mapping: dict[str, int]) -> None:
 def _schema(args: argparse.Namespace) -> int:
     schema = SUMMARY_JSON_SCHEMA if args.summary else JSONL_SCHEMA
     sys.stdout.write(json.dumps(schema, indent=2, sort_keys=True) + "\n")
+    return 0
+
+
+def _timeline(args: argparse.Namespace) -> int:
+    pcap_path = Path(args.pcap)
+    if not pcap_path.exists():
+        sys.stderr.write(f"error: pcap not found: {pcap_path}\n")
+        return 2
+    if not pcap_path.is_file():
+        sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
+        return 2
+
+    since_ts = args.since_ts if args.since_ts is not None else None
+    until_ts = args.until_ts if args.until_ts is not None else None
+    if since_ts is not None and until_ts is not None and since_ts > until_ts:
+        sys.stderr.write("error: since-ts must be <= until-ts\n")
+        return 2
+
+    hosts = _normalize_host_exact(args.host) or None
+    host_nets = _normalize_host_nets(args.host) or None
+    ports = set(args.port) or None
+    protos = _normalize_protos(args.proto) or None
+    timeline = timeline_pcap(
+        pcap_path,
+        max_packets=int(args.max_packets),
+        top_n=int(args.top),
+        since_ts=since_ts,
+        until_ts=until_ts,
+        hosts=hosts,
+        host_nets=host_nets,
+        ports=ports,
+        protos=protos,
+        normalize_flows=bool(args.normalize_flows),
+    )
+    if args.json:
+        sys.stdout.write(json.dumps(timeline, indent=2) + "\n")
+        return 0
+
+    totals = timeline["totals"]
+    sys.stdout.write(f"PCAP Timeline: {timeline['pcap']}\n")
+    if totals.get("max_packets"):
+        sys.stdout.write(f"Max packets: {totals['max_packets']}\n")
+    if totals.get("since_ts") is not None or totals.get("until_ts") is not None:
+        sys.stdout.write(f"Time window: {totals.get('since_ts')}..{totals.get('until_ts')}\n")
+    if totals.get("hosts") is not None or totals.get("host_nets") is not None:
+        sys.stdout.write(
+            "Host filters: host={hosts} cidr={cidr}\n".format(
+                hosts=totals.get("hosts"),
+                cidr=totals.get("host_nets"),
+            )
+        )
+    if totals.get("ports") is not None or totals.get("protos") is not None:
+        sys.stdout.write(
+            "Flow filters: port={ports} proto={protos}\n".format(
+                ports=totals.get("ports"),
+                protos=totals.get("protos"),
+            )
+        )
+    sys.stdout.write(
+        "Packets: {packets_seen} (IP: {ip_packets})\nFlows: {flows}\nBytes: {ip_bytes}\n".format(
+            **totals
+        )
+    )
+
+    flows = timeline["flows"]
+    if not flows:
+        return 0
+
+    base = totals.get("first_ts")
+    sys.stdout.write("\nTimeline (top flows by bytes)\n")
+    for row in flows:
+        first_ts = row.get("first_ts")
+        last_ts = row.get("last_ts")
+        offset = (
+            (float(first_ts) - float(base)) if base is not None and first_ts is not None else 0.0
+        )
+        duration = (
+            (float(last_ts) - float(first_ts))
+            if first_ts is not None and last_ts is not None
+            else 0.0
+        )
+        sys.stdout.write(
+            "  +{offset:>8.3f}s  {duration:>8.3f}s  {bytes:>10}B  {packets:>6}p  "
+            "dns={dns_events:>4} http={http_events:>4} tls={tls_client_hellos:>3}  {flow}\n".format(
+                offset=offset,
+                duration=duration,
+                bytes=int(row.get("bytes", 0) or 0),
+                packets=int(row.get("packets", 0) or 0),
+                dns_events=int(row.get("dns_events", 0) or 0),
+                http_events=int(row.get("http_events", 0) or 0),
+                tls_client_hellos=int(row.get("tls_client_hellos", 0) or 0),
+                flow=str(row.get("flow", "")),
+            )
+        )
     return 0
 
 

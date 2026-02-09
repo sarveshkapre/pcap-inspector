@@ -58,6 +58,45 @@ class PcapInspectorError(RuntimeError):
     pass
 
 
+@dataclass(slots=True)
+class _FlowTimeline:
+    key: str
+    packets: int = 0
+    bytes: int = 0
+    first_ts: float | None = None
+    last_ts: float | None = None
+    dns_events: int = 0
+    http_events: int = 0
+    tls_client_hellos: int = 0
+    tls_sni: str | None = None
+
+    def add_packet(self, pkt_len: int, ts: float) -> None:
+        self.packets += 1
+        self.bytes += pkt_len
+        if self.first_ts is None or ts < self.first_ts:
+            self.first_ts = ts
+        if self.last_ts is None or ts > self.last_ts:
+            self.last_ts = ts
+
+    def to_dict(self) -> dict[str, Any]:
+        first_ts = self.first_ts
+        last_ts = self.last_ts
+        return {
+            "flow": self.key,
+            "packets": self.packets,
+            "bytes": self.bytes,
+            "first_ts": first_ts,
+            "last_ts": last_ts,
+            "duration_s": (last_ts - first_ts)
+            if first_ts is not None and last_ts is not None
+            else None,
+            "dns_events": self.dns_events,
+            "http_events": self.http_events,
+            "tls_client_hellos": self.tls_client_hellos,
+            "tls_sni": self.tls_sni,
+        }
+
+
 def _flow_key(src: str, sport: int, dst: str, dport: int, proto: str) -> str:
     return f"{_fmt_hostport(src, sport)}->{_fmt_hostport(dst, dport)} {proto}"
 
@@ -784,3 +823,117 @@ def _top_flows_by_bytes(flows: dict[str, Flow], top_n: int) -> list[dict[str, ob
         return []
     top = sorted(flows.values(), key=lambda f: (-f.bytes, f.key))[:top_n]
     return [{"name": f.key, "count": f.bytes} for f in top]
+
+
+def timeline_pcap(
+    path: Path,
+    max_packets: int,
+    top_n: int = 20,
+    *,
+    since_ts: float | None = None,
+    until_ts: float | None = None,
+    hosts: set[str] | None = None,
+    host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
+    ports: set[int] | None = None,
+    protos: set[str] | None = None,
+    normalize_flows: bool = False,
+) -> dict[str, Any]:
+    flows: dict[str, _FlowTimeline] = {}
+    tcp_streams: dict[str, _TcpStream] = {}
+
+    ip_packets = 0
+    ip_bytes = 0
+    packets_seen = 0
+    first_ts: float | None = None
+    last_ts: float | None = None
+
+    for pkt in _iter_packets(path):
+        pkt_ts = float(getattr(pkt, "time", 0.0))
+        if since_ts is not None and pkt_ts < since_ts:
+            continue
+        if until_ts is not None and pkt_ts > until_ts:
+            continue
+
+        flow_parts = _extract_flow_parts(pkt)
+        if flow_parts is None:
+            continue
+        src, sport, dst, dport, proto = flow_parts
+        if protos is not None and proto not in protos:
+            continue
+        if (hosts is not None or host_nets is not None) and not _host_matches(
+            src, dst, hosts, host_nets
+        ):
+            continue
+        if ports is not None and sport not in ports and dport not in ports:
+            continue
+        if max_packets and packets_seen >= max_packets:
+            break
+
+        packets_seen += 1
+        ip_packets += 1
+        ip_bytes += len(pkt)
+        if first_ts is None or pkt_ts < first_ts:
+            first_ts = pkt_ts
+        if last_ts is None or pkt_ts > last_ts:
+            last_ts = pkt_ts
+
+        stream_key = _flow_key(src, sport, dst, dport, proto)
+        key = _flow_key_with_mode(
+            src,
+            sport,
+            dst,
+            dport,
+            proto,
+            normalize_flows=normalize_flows,
+        )
+        timeline = flows.setdefault(key, _FlowTimeline(key))
+        timeline.add_packet(len(pkt), pkt_ts)
+
+        if _extract_dns(pkt):
+            timeline.dns_events += 1
+
+        if _extract_http(pkt):
+            timeline.http_events += 1
+
+        if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            payload = bytes(pkt[Raw].load)
+            stream = tcp_streams.setdefault(stream_key, _TcpStream())
+            stream.push(int(pkt[TCP].seq), payload)
+            if not stream.extracted:
+                meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
+                if meta:
+                    timeline.tls_client_hellos += 1
+                    if timeline.tls_sni is None and "sni" in meta:
+                        timeline.tls_sni = cast(str, meta["sni"])
+                    stream.extracted = True
+
+    flow_values = list(flows.values())
+    if top_n > 0:
+        flow_values = sorted(flow_values, key=lambda f: (-f.bytes, f.key))[:top_n]
+    # Keep output timeline-ordered (start time), tie-break by key.
+    flow_values = sorted(flow_values, key=lambda f: (f.first_ts or 0.0, f.key))
+
+    return {
+        "pcap": str(path),
+        "totals": {
+            "packets_seen": packets_seen,
+            "max_packets": max_packets,
+            "ip_packets": ip_packets,
+            "ip_bytes": ip_bytes,
+            "flows": len(flows),
+            "first_ts": first_ts,
+            "last_ts": last_ts,
+            "duration_s": (last_ts - first_ts)
+            if first_ts is not None and last_ts is not None
+            else None,
+            "since_ts": since_ts,
+            "until_ts": until_ts,
+            "hosts": sorted(hosts) if hosts else None,
+            "host_nets": [str(net) for net in host_nets] if host_nets else None,
+            "ports": sorted(ports) if ports else None,
+            "protos": sorted(protos) if protos else None,
+            "normalize_flows": normalize_flows,
+            "top": top_n,
+        },
+        "flows": [f.to_dict() for f in flow_values],
+    }

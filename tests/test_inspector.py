@@ -17,7 +17,7 @@ from scapy.layers.inet6 import IPv6
 from scapy.packet import Raw
 from scapy.utils import wrpcap
 
-from pcap_inspector.inspector import inspect_pcap, summarize_pcap
+from pcap_inspector.inspector import inspect_pcap, summarize_pcap, timeline_pcap
 
 
 def _tls_client_hello_record(*, sni: str) -> bytes:
@@ -422,6 +422,24 @@ def test_summarize_pcap(tmp_path: Path) -> None:
     assert totals["flows"] == 2
     assert totals["dns_queries"] == 1
     assert totals["http_requests"] == 1
+
+
+def test_timeline_pcap_top_flows_by_bytes(tmp_path: Path) -> None:
+    pkt_big_a = IP(src="10.0.0.1", dst="8.8.8.8") / UDP(sport=1111, dport=53) / Raw(load=b"x" * 200)
+    pkt_big_b = IP(src="10.0.0.1", dst="8.8.8.8") / UDP(sport=1111, dport=53) / Raw(load=b"y" * 200)
+    pkt_small = IP(src="10.0.0.2", dst="8.8.8.8") / UDP(sport=2222, dport=53) / Raw(load=b"z")
+    pkt_big_a.time = 2.0
+    pkt_big_b.time = 1.0
+    pkt_small.time = 3.0
+    pcap = tmp_path / "timeline.pcap"
+    wrpcap(str(pcap), [pkt_big_a, pkt_big_b, pkt_small])
+
+    timeline = timeline_pcap(pcap, max_packets=0, top_n=1)
+    flows = timeline["flows"]
+    assert len(flows) == 1
+    assert flows[0]["flow"].startswith("10.0.0.1:")
+    assert flows[0]["first_ts"] == 1.0
+    assert flows[0]["last_ts"] == 2.0
 
 
 def test_inspect_pcap_http_put_method(tmp_path: Path) -> None:
