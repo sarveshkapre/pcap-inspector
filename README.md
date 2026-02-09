@@ -63,6 +63,7 @@ make check
 ```bash
 .venv/bin/pcap-inspector summary --pcap capture.pcap
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json
+.venv/bin/pcap-inspector summary --pcap capture.pcap --format json
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --normalize-flows
 ```
 
@@ -71,6 +72,7 @@ make check
 ```bash
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --json
+.venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --format json
 ```
 
 ## Schemas

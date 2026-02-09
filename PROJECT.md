@@ -66,6 +66,7 @@ make bench-events
 ```bash
 .venv/bin/pcap-inspector summary --pcap capture.pcap
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json
+.venv/bin/pcap-inspector summary --pcap capture.pcap --format json
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --normalize-flows
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --since-ts 1700000000 --until-ts 1700003600
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --host 10.0.0.5 --port 443 --proto tcp
@@ -76,6 +77,7 @@ make bench-events
 ```bash
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --json
+.venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --format json
 ```
 
 ## Schema

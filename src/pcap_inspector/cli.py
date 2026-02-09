@@ -285,7 +285,13 @@ def main(argv: list[str] | None = None) -> int:
             "(repeatable; comma-separated; example: 443,8443)"
         ),
     )
-    p_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    p_summary.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=None,
+        help="Output format (default: text). Use 'json' for machine-readable output.",
+    )
+    p_summary.add_argument("--json", action="store_true", help="Alias for `--format json`")
     p_summary.set_defaults(func=_summary)
 
     p_schema = sub.add_parser("schema", help="Print JSON Schema for JSON output formats")
@@ -351,7 +357,13 @@ def main(argv: list[str] | None = None) -> int:
             "(repeatable; comma-separated; example: 443,8443)"
         ),
     )
-    p_timeline.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
+    p_timeline.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=None,
+        help="Output format (default: text). Use 'json' for machine-readable output.",
+    )
+    p_timeline.add_argument("--json", action="store_true", help="Alias for `--format json`")
     p_timeline.set_defaults(func=_timeline)
 
     args = parser.parse_args(argv)
@@ -446,7 +458,13 @@ def _summary(args: argparse.Namespace) -> int:
         tls_ports=_normalize_ports_csv(args.tls_ports) or None,
         normalize_flows=bool(args.normalize_flows),
     )
+    fmt = str(args.format) if args.format is not None else None
     if args.json:
+        if fmt is not None and fmt != "json":
+            sys.stderr.write("error: --json conflicts with --format text\n")
+            return 2
+        fmt = "json"
+    if fmt == "json":
         sys.stdout.write(json.dumps(summary, indent=2) + "\n")
         return 0
 
@@ -525,7 +543,13 @@ def _timeline(args: argparse.Namespace) -> int:
         tls_ports=_normalize_ports_csv(args.tls_ports) or None,
         normalize_flows=bool(args.normalize_flows),
     )
+    fmt = str(args.format) if args.format is not None else None
     if args.json:
+        if fmt is not None and fmt != "json":
+            sys.stderr.write("error: --json conflicts with --format text\n")
+            return 2
+        fmt = "json"
+    if fmt == "json":
         sys.stdout.write(json.dumps(timeline, indent=2) + "\n")
         return 0
 

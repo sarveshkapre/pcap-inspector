@@ -14,6 +14,7 @@ logging.getLogger("scapy").setLevel(logging.ERROR)
 from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.inet import IP, TCP, UDP
 from scapy.layers.inet6 import IPv6
+from scapy.layers.l2 import Ether
 from scapy.packet import Raw
 from scapy.utils import PcapNgWriter, wrpcap
 
@@ -65,7 +66,8 @@ def test_inspect_pcap(tmp_path: Path) -> None:
 
 def test_inspect_pcap_reads_pcapng(tmp_path: Path) -> None:
     pkt = (
-        IP(src="1.1.1.1", dst="8.8.8.8")
+        Ether()
+        / IP(src="1.1.1.1", dst="8.8.8.8")
         / UDP(sport=1234, dport=53)
         / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
     )
