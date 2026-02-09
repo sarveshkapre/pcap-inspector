@@ -127,6 +127,7 @@
   - Smoke: `.venv/bin/pcap-inspector inspect --pcap bench/fixture-20000p-500f-0b.pcap --out - --no-include-flows --top-events 5 --top-events-mode flow-bytes --http-ports 80,8080 --stats-json` (pass; stats include `top_events_mode: flow-bytes`)
   - Smoke: `.venv/bin/pcap-inspector timeline --pcap bench/fixture-20000p-500f-0b.pcap --top 3` (pass)
   - Smoke: `.venv/bin/pcap-inspector schema --summary` (pass)
+  - GitHub Actions: workflow `ci` runs `21837369543`, `21837429175`, `21837431468` (all success)
 - Mistakes And Fixes:
   - Root cause: `git push` over HTTPS can hang due to global `credential.helper=osxkeychain` in headless automation.
   - Fix: Use GitHub API (git data endpoints) to advance `refs/heads/main` when git smart-HTTP is unreachable; for normal pushes, prefer `gh auth git-credential` helper overrides.
