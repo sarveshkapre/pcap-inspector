@@ -51,6 +51,8 @@ make bench-events
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.5 --port 443 --proto tcp
 # or only attempt HTTP parsing on specific ports (reduce false positives):
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --http-ports 80,8080
+# or only attempt TLS parsing on specific ports (reduce false positives):
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --tls-ports 443,8443
 # include per-flow start/end timestamps in flow rows:
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
 # stable ordering for diffing:

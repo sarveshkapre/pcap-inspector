@@ -497,6 +497,62 @@ def test_inspect_pcap_http_ports_filter(tmp_path: Path) -> None:
     assert http_lines == ["GET /ok HTTP/1.1"]
 
 
+def test_inspect_pcap_tls_ports_filter(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=443, seq=1)
+        / Raw(load=_tls_client_hello_record(sni="example.com"))
+    )
+    pcap = tmp_path / "tls-ports.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    out_skip = tmp_path / "out-skip.jsonl"
+    inspect_pcap(
+        pcap,
+        out_skip,
+        max_packets=0,
+        include_flows=False,
+        include_dns=False,
+        include_http=False,
+        include_tls=True,
+        tls_ports={8443},
+    )
+    events_skip = [json.loads(line) for line in out_skip.read_text(encoding="utf-8").splitlines()]
+    assert not any(e.get("type") == "tls" for e in events_skip)
+
+    out_ok = tmp_path / "out-ok.jsonl"
+    inspect_pcap(
+        pcap,
+        out_ok,
+        max_packets=0,
+        include_flows=False,
+        include_dns=False,
+        include_http=False,
+        include_tls=True,
+        tls_ports={443},
+    )
+    events_ok = [json.loads(line) for line in out_ok.read_text(encoding="utf-8").splitlines()]
+    assert any(e.get("type") == "tls" and e.get("sni") == "example.com" for e in events_ok)
+
+
+def test_summarize_and_timeline_tls_ports_filter(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=443, seq=1)
+        / Raw(load=_tls_client_hello_record(sni="example.com"))
+    )
+    pcap = tmp_path / "tls-ports-summary.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=10, tls_ports={8443})
+    assert summary["totals"]["tls_client_hellos"] == 0
+    assert summary["top_tls_sni"] == []
+
+    timeline = timeline_pcap(pcap, max_packets=0, top_n=10, tls_ports={8443})
+    assert timeline["flows"][0]["tls_client_hellos"] == 0
+    assert timeline["flows"][0]["tls_sni"] is None
+
+
 def test_inspect_pcap_max_packets_stats_json(tmp_path: Path) -> None:
     pkt_a = (
         IP(src="1.1.1.1", dst="8.8.8.8")

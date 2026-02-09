@@ -170,6 +170,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_run.add_argument(
+        "--tls-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt TLS ClientHello parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 443,8443)"
+        ),
+    )
+    p_run.add_argument(
         "--host",
         action="append",
         default=[],
@@ -267,6 +276,15 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Normalize bidirectional flow keys as A:port<->B:port",
     )
+    p_summary.add_argument(
+        "--tls-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt TLS ClientHello parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 443,8443)"
+        ),
+    )
     p_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     p_summary.set_defaults(func=_summary)
 
@@ -324,6 +342,15 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Normalize bidirectional flow keys as A:port<->B:port",
     )
+    p_timeline.add_argument(
+        "--tls-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt TLS ClientHello parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 443,8443)"
+        ),
+    )
     p_timeline.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     p_timeline.set_defaults(func=_timeline)
 
@@ -358,6 +385,7 @@ def _run(args: argparse.Namespace) -> int:
     hosts = _normalize_host_exact(args.host)
     host_nets = _normalize_host_nets(args.host)
     http_ports = _normalize_ports_csv(args.http_ports)
+    tls_ports = _normalize_ports_csv(args.tls_ports)
     ports = set(args.port)
     protos = _normalize_protos(args.proto)
     rc = inspect_pcap(
@@ -375,6 +403,7 @@ def _run(args: argparse.Namespace) -> int:
         hosts=hosts if hosts else None,
         host_nets=host_nets if host_nets else None,
         http_ports=http_ports if http_ports else None,
+        tls_ports=tls_ports if tls_ports else None,
         ports=ports if ports else None,
         protos=protos if protos else None,
         normalize_flows=bool(args.normalize_flows),
@@ -414,6 +443,7 @@ def _summary(args: argparse.Namespace) -> int:
         host_nets=_normalize_host_nets(args.host) or None,
         ports=set(args.port) or None,
         protos=_normalize_protos(args.proto) or None,
+        tls_ports=_normalize_ports_csv(args.tls_ports) or None,
         normalize_flows=bool(args.normalize_flows),
     )
     if args.json:
@@ -492,6 +522,7 @@ def _timeline(args: argparse.Namespace) -> int:
         host_nets=host_nets,
         ports=ports,
         protos=protos,
+        tls_ports=_normalize_ports_csv(args.tls_ports) or None,
         normalize_flows=bool(args.normalize_flows),
     )
     if args.json:

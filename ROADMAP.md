@@ -8,4 +8,3 @@
 ## Next
 
 - Restricted `--bpf` / `--filter` option for parity with common PCAP tooling.
-- Optional TLS port filtering (`--tls-ports`) to reduce false positives.

@@ -486,6 +486,7 @@ def _inspect_pcap_top_events_flow_bytes_mode(
     include_dns: bool,
     include_http: bool,
     include_tls: bool,
+    tls_ports: set[int] | None,
     top_flows: int,
     top_events: int,
     since_ts: float | None,
@@ -602,6 +603,8 @@ def _inspect_pcap_top_events_flow_bytes_mode(
         if include_tls and pkt.haslayer(TCP) and pkt.haslayer(Raw):
             if len(best) >= top_events and flow_bytes < best[0][0]:
                 continue
+            if tls_ports is not None and sport not in tls_ports and dport not in tls_ports:
+                continue
             payload = bytes(pkt[Raw].load)
             stream = tcp_streams.setdefault(stream_key, _TcpStream())
             stream.push(int(pkt[TCP].seq), payload)
@@ -666,6 +669,7 @@ def _inspect_pcap_top_events_flow_bytes_mode(
             "hosts": sorted(hosts) if hosts else None,
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "http_ports": sorted(http_ports) if http_ports else None,
+            "tls_ports": sorted(tls_ports) if tls_ports else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
         }
@@ -686,6 +690,7 @@ def inspect_pcap(
     include_dns: bool = True,
     include_http: bool = True,
     include_tls: bool = True,
+    tls_ports: set[int] | None = None,
     top_flows: int = 0,
     top_events: int = 0,
     top_events_mode: str = "packet",
@@ -714,6 +719,7 @@ def inspect_pcap(
             include_dns=include_dns,
             include_http=include_http,
             include_tls=include_tls,
+            tls_ports=tls_ports,
             top_flows=top_flows,
             top_events=top_events,
             since_ts=since_ts,
@@ -823,6 +829,7 @@ def inspect_pcap(
             if (
                 (top_events == 0 or events_emitted < top_events)
                 and include_tls
+                and (tls_ports is None or sport in tls_ports or dport in tls_ports)
                 and pkt.haslayer(TCP)
                 and pkt.haslayer(Raw)
             ):
@@ -874,6 +881,7 @@ def inspect_pcap(
             "hosts": sorted(hosts) if hosts else None,
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "http_ports": sorted(http_ports) if http_ports else None,
+            "tls_ports": sorted(tls_ports) if tls_ports else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
         }
@@ -895,6 +903,8 @@ def _write_stats_text(out: TextIO, stats: dict[str, object]) -> None:
             out.write(f"Event mode: {stats.get('top_events_mode')}\n")
     if stats.get("http_ports") is not None:
         out.write(f"HTTP ports: {stats.get('http_ports')}\n")
+    if stats.get("tls_ports") is not None:
+        out.write(f"TLS ports: {stats.get('tls_ports')}\n")
     if stats.get("since_ts") is not None or stats.get("until_ts") is not None:
         out.write(f"Time window: {stats.get('since_ts')}..{stats.get('until_ts')}\n")
     if (
@@ -931,6 +941,7 @@ def summarize_pcap(
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
+    tls_ports: set[int] | None = None,
     normalize_flows: bool = False,
 ) -> dict[str, Any]:
     flows: dict[str, Flow] = {}
@@ -1022,6 +1033,8 @@ def summarize_pcap(
                     http_status_codes[parts[1]] += 1
 
         if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            if tls_ports is not None and sport not in tls_ports and dport not in tls_ports:
+                continue
             payload = bytes(pkt[Raw].load)
             stream = tcp_streams.setdefault(stream_key, _TcpStream())
             stream.push(int(pkt[TCP].seq), payload)
@@ -1117,6 +1130,7 @@ def timeline_pcap(
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
+    tls_ports: set[int] | None = None,
     normalize_flows: bool = False,
 ) -> dict[str, Any]:
     flows: dict[str, _FlowTimeline] = {}
@@ -1177,6 +1191,8 @@ def timeline_pcap(
             timeline.http_events += 1
 
         if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            if tls_ports is not None and sport not in tls_ports and dport not in tls_ports:
+                continue
             payload = bytes(pkt[Raw].load)
             stream = tcp_streams.setdefault(stream_key, _TcpStream())
             stream.push(int(pkt[TCP].seq), payload)

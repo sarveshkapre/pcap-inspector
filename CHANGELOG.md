@@ -4,7 +4,7 @@
 
 - PCAPNG read support via Scapy `PcapNgReader`.
 - Restricted `--bpf` / `--filter` option for parity with common PCAP tooling.
-- Optional TLS port filtering (`--tls-ports`) to reduce false positives.
+- Add `--tls-ports` to scope TLS parsing and reduce false positives.
 
 ## v0.1.2 - 2026-02-09
 

@@ -9,6 +9,7 @@ Minimal PCAP analyzer that extracts flow summaries and basic DNS/HTTP metadata.
 - DNS query metadata.
 - HTTP request/response line extraction (best-effort).
 - TLS ClientHello SNI/ALPN extraction (best-effort).
+- Optional TLS port filtering (`--tls-ports`) to reduce false positives.
 - Timestamp window filtering (`--since-ts/--until-ts`) for targeted triage runs.
 - Flow filtering (`--host/--port/--proto`) to reduce noise without post-processing.
 - JSONL output.
@@ -47,6 +48,8 @@ make check
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.0/8 --port 443 --proto tcp
 # or only attempt HTTP parsing on specific ports (reduce false positives):
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --http-ports 80,8080
+# or only attempt TLS parsing on specific ports (reduce false positives):
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --tls-ports 443,8443
 # include per-flow start/end timestamps in flow rows:
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
 # stable ordering for diffing:
