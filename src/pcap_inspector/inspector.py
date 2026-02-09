@@ -3,6 +3,7 @@ from __future__ import annotations
 # ruff: noqa: E402
 
 import logging
+import heapq
 import json
 import sys
 import ipaddress
@@ -221,6 +222,42 @@ def _extract_flow_parts(pkt: Any) -> tuple[str, int, str, int, str] | None:
     return str(ip.src), sport, str(ip.dst), dport, proto
 
 
+def _iter_filtered_packets(
+    path: Path,
+    *,
+    max_packets: int,
+    since_ts: float | None,
+    until_ts: float | None,
+    hosts: set[str] | None,
+    host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None,
+    ports: set[int] | None,
+    protos: set[str] | None,
+) -> Iterable[tuple[Any, float, str, int, str, int, str]]:
+    processed = 0
+    for pkt in _iter_packets(path):
+        pkt_ts = float(getattr(pkt, "time", 0.0))
+        if since_ts is not None and pkt_ts < since_ts:
+            continue
+        if until_ts is not None and pkt_ts > until_ts:
+            continue
+        flow_parts = _extract_flow_parts(pkt)
+        if flow_parts is None:
+            continue
+        src, sport, dst, dport, proto = flow_parts
+        if protos is not None and proto not in protos:
+            continue
+        if (hosts is not None or host_nets is not None) and not _host_matches(
+            src, dst, hosts, host_nets
+        ):
+            continue
+        if ports is not None and sport not in ports and dport not in ports:
+            continue
+        if max_packets and processed >= max_packets:
+            break
+        processed += 1
+        yield pkt, pkt_ts, src, sport, dst, dport, proto
+
+
 @dataclass(slots=True)
 class _TcpStream:
     max_bytes: int = 256 * 1024
@@ -435,6 +472,206 @@ def _parse_tls_alpn_extension(ext: bytes) -> list[str]:
     return protos
 
 
+def _inspect_pcap_top_events_flow_bytes_mode(
+    path: Path,
+    out_path: Path,
+    max_packets: int,
+    *,
+    include_flows: bool,
+    sort_flows: bool,
+    include_dns: bool,
+    include_http: bool,
+    include_tls: bool,
+    top_flows: int,
+    top_events: int,
+    since_ts: float | None,
+    until_ts: float | None,
+    hosts: set[str] | None,
+    host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None,
+    http_ports: set[int] | None,
+    ports: set[int] | None,
+    protos: set[str] | None,
+    normalize_flows: bool,
+    include_flow_times: bool,
+    stats_out: TextIO | None,
+    stats_json: bool,
+) -> int:
+    flows: dict[str, Flow] = {}
+    packets_seen = 0
+    ip_packets = 0
+    ip_bytes = 0
+
+    for packets_seen, (pkt, pkt_ts, src, sport, dst, dport, proto) in enumerate(
+        _iter_filtered_packets(
+            path,
+            max_packets=max_packets,
+            since_ts=since_ts,
+            until_ts=until_ts,
+            hosts=hosts,
+            host_nets=host_nets,
+            ports=ports,
+            protos=protos,
+        ),
+        start=1,
+    ):
+        ip_packets += 1
+        ip_bytes += len(pkt)
+        key = _flow_key_with_mode(
+            src,
+            sport,
+            dst,
+            dport,
+            proto,
+            normalize_flows=normalize_flows,
+        )
+        prev = flows.get(key)
+        if prev:
+            if include_flow_times:
+                first_ts = prev.first_ts
+                last_ts = prev.last_ts
+                if first_ts is None or pkt_ts < first_ts:
+                    first_ts = pkt_ts
+                if last_ts is None or pkt_ts > last_ts:
+                    last_ts = pkt_ts
+                flows[key] = Flow(
+                    key,
+                    prev.packets + 1,
+                    prev.bytes + len(pkt),
+                    first_ts=first_ts,
+                    last_ts=last_ts,
+                )
+            else:
+                flows[key] = Flow(key, prev.packets + 1, prev.bytes + len(pkt))
+        else:
+            if include_flow_times:
+                flows[key] = Flow(key, 1, len(pkt), first_ts=pkt_ts, last_ts=pkt_ts)
+            else:
+                flows[key] = Flow(key, 1, len(pkt))
+
+    best: list[tuple[int, float, int, int, dict[str, Any]]] = []
+    tcp_streams: dict[str, _TcpStream] = {}
+    seq = 0
+    for pkt, pkt_ts, src, sport, dst, dport, proto in _iter_filtered_packets(
+        path,
+        max_packets=max_packets,
+        since_ts=since_ts,
+        until_ts=until_ts,
+        hosts=hosts,
+        host_nets=host_nets,
+        ports=ports,
+        protos=protos,
+    ):
+        seq += 1
+        stream_key = _flow_key(src, sport, dst, dport, proto)
+        key = _flow_key_with_mode(
+            src,
+            sport,
+            dst,
+            dport,
+            proto,
+            normalize_flows=normalize_flows,
+        )
+        flow = flows.get(key)
+        flow_bytes = flow.bytes if flow is not None else 0
+        if len(best) >= top_events and flow_bytes < best[0][0]:
+            continue
+
+        event: dict[str, Any] | None = None
+        if include_dns:
+            event = _extract_dns(pkt)
+        if (
+            event is None
+            and include_http
+            and (http_ports is None or sport in http_ports or dport in http_ports)
+        ):
+            event = _extract_http(pkt)
+        if event:
+            record = dict(event)
+            record["ts"] = pkt_ts
+            record["flow"] = key
+            quality = (flow_bytes, -pkt_ts, -seq, seq, record)
+            if len(best) < top_events:
+                heapq.heappush(best, quality)
+            elif quality > best[0]:
+                heapq.heapreplace(best, quality)
+
+        if include_tls and pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            if len(best) >= top_events and flow_bytes < best[0][0]:
+                continue
+            payload = bytes(pkt[Raw].load)
+            stream = tcp_streams.setdefault(stream_key, _TcpStream())
+            stream.push(int(pkt[TCP].seq), payload)
+            if not stream.extracted:
+                meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
+                if meta:
+                    record = {"type": "tls", "ts": pkt_ts, "flow": key, **meta}
+                    quality = (flow_bytes, -pkt_ts, -seq, seq, record)
+                    if len(best) < top_events:
+                        heapq.heappush(best, quality)
+                    elif quality > best[0]:
+                        heapq.heapreplace(best, quality)
+                    stream.extracted = True
+
+    use_stdout = out_path.as_posix() == "-"
+    if not use_stdout:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    dns_events = 0
+    http_events = 0
+    tls_events = 0
+    events_emitted = 0
+    out_ctx = nullcontext(sys.stdout) if use_stdout else out_path.open("w", encoding="utf-8")
+    with out_ctx as out:
+        out = cast(TextIO, out)
+        selected = sorted(best, key=lambda r: (-r[0], -r[1], r[3]))
+        for _, _, _, _, record in selected:
+            out.write(json.dumps(record) + "\n")
+            events_emitted += 1
+            if record.get("type") == "dns":
+                dns_events += 1
+            elif record.get("type") == "http":
+                http_events += 1
+            elif record.get("type") == "tls":
+                tls_events += 1
+
+        if include_flows:
+            flow_values = list(flows.values())
+            if top_flows > 0:
+                flow_values = sorted(flow_values, key=lambda f: (-f.bytes, f.key))[:top_flows]
+            if sort_flows:
+                flow_values.sort(key=lambda f: f.key)
+            for flow in flow_values:
+                out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
+
+    if stats_out is not None:
+        stats: dict[str, object] = {
+            "pcap": str(path),
+            "max_packets": max_packets,
+            "packets_seen": packets_seen,
+            "ip_packets": ip_packets,
+            "ip_bytes": ip_bytes,
+            "flows": len(flows),
+            "top_events": top_events,
+            "top_events_mode": "flow-bytes",
+            "events_emitted": events_emitted,
+            "dns_events": dns_events,
+            "http_events": http_events,
+            "tls_events": tls_events,
+            "since_ts": since_ts,
+            "until_ts": until_ts,
+            "hosts": sorted(hosts) if hosts else None,
+            "host_nets": [str(net) for net in host_nets] if host_nets else None,
+            "http_ports": sorted(http_ports) if http_ports else None,
+            "ports": sorted(ports) if ports else None,
+            "protos": sorted(protos) if protos else None,
+        }
+        if stats_json:
+            stats_out.write(json.dumps(stats, indent=2) + "\n")
+        else:
+            _write_stats_text(stats_out, stats)
+    return 0
+
+
 def inspect_pcap(
     path: Path,
     out_path: Path,
@@ -447,10 +684,12 @@ def inspect_pcap(
     include_tls: bool = True,
     top_flows: int = 0,
     top_events: int = 0,
+    top_events_mode: str = "packet",
     since_ts: float | None = None,
     until_ts: float | None = None,
     hosts: set[str] | None = None,
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
+    http_ports: set[int] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
     normalize_flows: bool = False,
@@ -458,6 +697,34 @@ def inspect_pcap(
     stats_out: TextIO | None = None,
     stats_json: bool = False,
 ) -> int:
+    if top_events_mode != "packet" and top_events <= 0:
+        top_events_mode = "packet"
+
+    if top_events_mode == "flow-bytes" and top_events > 0:
+        return _inspect_pcap_top_events_flow_bytes_mode(
+            path,
+            out_path,
+            max_packets,
+            include_flows=include_flows,
+            sort_flows=sort_flows,
+            include_dns=include_dns,
+            include_http=include_http,
+            include_tls=include_tls,
+            top_flows=top_flows,
+            top_events=top_events,
+            since_ts=since_ts,
+            until_ts=until_ts,
+            hosts=hosts,
+            host_nets=host_nets,
+            http_ports=http_ports,
+            ports=ports,
+            protos=protos,
+            normalize_flows=normalize_flows,
+            include_flow_times=include_flow_times,
+            stats_out=stats_out,
+            stats_json=stats_json,
+        )
+
     flows: dict[str, Flow] = {}
     tcp_streams: dict[str, _TcpStream] = {}
     use_stdout = out_path.as_posix() == "-"
@@ -533,7 +800,11 @@ def inspect_pcap(
                 event: dict[str, Any] | None = None
                 if include_dns:
                     event = _extract_dns(pkt)
-                if event is None and include_http:
+                if (
+                    event is None
+                    and include_http
+                    and (http_ports is None or sport in http_ports or dport in http_ports)
+                ):
                     event = _extract_http(pkt)
                 if event:
                     event["ts"] = pkt_ts
@@ -589,6 +860,7 @@ def inspect_pcap(
             "ip_bytes": ip_bytes,
             "flows": len(flows),
             "top_events": top_events,
+            "top_events_mode": top_events_mode,
             "events_emitted": events_emitted,
             "dns_events": dns_events,
             "http_events": http_events,
@@ -597,6 +869,7 @@ def inspect_pcap(
             "until_ts": until_ts,
             "hosts": sorted(hosts) if hosts else None,
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
+            "http_ports": sorted(http_ports) if http_ports else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
         }
@@ -614,6 +887,10 @@ def _write_stats_text(out: TextIO, stats: dict[str, object]) -> None:
         out.write(f"Max packets: {stats['max_packets']}\n")
     if stats["top_events"]:
         out.write(f"Max events: {stats['top_events']}\n")
+        if stats.get("top_events_mode") and stats.get("top_events_mode") != "packet":
+            out.write(f"Event mode: {stats.get('top_events_mode')}\n")
+    if stats.get("http_ports") is not None:
+        out.write(f"HTTP ports: {stats.get('http_ports')}\n")
     if stats.get("since_ts") is not None or stats.get("until_ts") is not None:
         out.write(f"Time window: {stats.get('since_ts')}..{stats.get('until_ts')}\n")
     if (

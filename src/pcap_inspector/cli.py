@@ -84,6 +84,13 @@ def _normalize_protos(values: Sequence[str]) -> set[str]:
     return out
 
 
+def _normalize_ports_csv(values: Sequence[str]) -> set[int]:
+    out: set[int] = set()
+    for raw in _split_csv(values):
+        out.add(_port(raw))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
     parser.add_argument("--version", action="version", version="0.1.1")
@@ -142,6 +149,25 @@ def main(argv: list[str] | None = None) -> int:
         type=_non_negative_int,
         default=0,
         help="Only include first N event rows (DNS/HTTP/TLS) in packet order (0 = all events)",
+    )
+    p_run.add_argument(
+        "--top-events-mode",
+        choices=["packet", "flow-bytes"],
+        default="packet",
+        help=(
+            "How to choose events when --top-events is set. "
+            "'packet' keeps first N in packet order; "
+            "'flow-bytes' prioritizes events from the highest-byte flows (two-pass)."
+        ),
+    )
+    p_run.add_argument(
+        "--http-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt HTTP parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 80,8080)"
+        ),
     )
     p_run.add_argument(
         "--host",
@@ -323,11 +349,15 @@ def _run(args: argparse.Namespace) -> int:
     if since_ts is not None and until_ts is not None and since_ts > until_ts:
         sys.stderr.write("error: since-ts must be <= until-ts\n")
         return 2
+    if args.top_events_mode != "packet" and int(args.top_events) <= 0:
+        sys.stderr.write("error: --top-events-mode requires --top-events > 0\n")
+        return 2
 
     stats_out = sys.stderr if args.stats or args.stats_json else None
     out_path = Path(args.out)
     hosts = _normalize_host_exact(args.host)
     host_nets = _normalize_host_nets(args.host)
+    http_ports = _normalize_ports_csv(args.http_ports)
     ports = set(args.port)
     protos = _normalize_protos(args.proto)
     rc = inspect_pcap(
@@ -339,10 +369,12 @@ def _run(args: argparse.Namespace) -> int:
         sort_flows=bool(args.sort_flows),
         top_flows=int(args.top_flows),
         top_events=int(args.top_events),
+        top_events_mode=str(args.top_events_mode),
         since_ts=since_ts,
         until_ts=until_ts,
         hosts=hosts if hosts else None,
         host_nets=host_nets if host_nets else None,
+        http_ports=http_ports if http_ports else None,
         ports=ports if ports else None,
         protos=protos if protos else None,
         normalize_flows=bool(args.normalize_flows),

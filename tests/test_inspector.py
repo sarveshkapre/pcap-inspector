@@ -460,6 +460,27 @@ def test_inspect_pcap_http_put_method(tmp_path: Path) -> None:
     )
 
 
+def test_inspect_pcap_http_ports_filter(tmp_path: Path) -> None:
+    pkt_ok = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"GET /ok HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pkt_skip = (
+        IP(src="10.0.0.2", dst="93.184.216.34")
+        / TCP(sport=55556, dport=12345, seq=1)
+        / Raw(load=b"GET /skip HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pcap = tmp_path / "http-ports.pcap"
+    wrpcap(str(pcap), [pkt_ok, pkt_skip])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0, include_flows=False, http_ports={80})
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    http_lines = [e.get("request_line", "") for e in events if e.get("type") == "http"]
+    assert http_lines == ["GET /ok HTTP/1.1"]
+
+
 def test_inspect_pcap_max_packets_stats_json(tmp_path: Path) -> None:
     pkt_a = (
         IP(src="1.1.1.1", dst="8.8.8.8")
@@ -557,6 +578,40 @@ def test_inspect_pcap_top_events(tmp_path: Path) -> None:
     events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
     assert len(events) == 2
     assert [e["type"] for e in events] == ["dns", "http"]
+
+
+def test_inspect_pcap_top_events_flow_bytes_mode(tmp_path: Path) -> None:
+    pkt_small = (
+        IP(src="10.0.0.10", dst="93.184.216.34")
+        / TCP(sport=40000, dport=80, seq=1)
+        / Raw(load=b"GET /small HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pkt_big = (
+        IP(src="10.0.0.11", dst="93.184.216.34")
+        / TCP(sport=40001, dport=80, seq=1)
+        / Raw(load=b"GET /big HTTP/1.1\r\nHost: example.com\r\n\r\n" + b"x" * 800)
+    )
+    pkt_small.time = 1.0
+    pkt_big.time = 2.0
+    pcap = tmp_path / "top-events-flow-bytes.pcap"
+    wrpcap(str(pcap), [pkt_small, pkt_big])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_flows=False,
+        top_events=1,
+        top_events_mode="flow-bytes",
+        include_dns=False,
+        include_http=True,
+        include_tls=False,
+    )
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert len(events) == 1
+    assert events[0].get("type") == "http"
+    assert "GET /big HTTP/1.1" in (events[0].get("request_line") or "")
 
 
 def test_inspect_pcap_normalize_flows(tmp_path: Path) -> None:

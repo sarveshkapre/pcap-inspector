@@ -122,3 +122,27 @@ def test_pcapng_errors_cleanly(tmp_path: Path) -> None:
     assert proc.returncode != 0
     assert "error:" in (proc.stderr or "")
     assert "pcapng" in (proc.stderr or "").lower()
+
+
+def test_top_events_mode_requires_top_events(tmp_path: Path) -> None:
+    pcap = tmp_path / "dummy.pcap"
+    pcap.write_bytes(b"")
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pcap_inspector",
+            "inspect",
+            "--pcap",
+            str(pcap),
+            "--out",
+            "-",
+            "--top-events-mode",
+            "flow-bytes",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0
+    assert "--top-events-mode requires --top-events" in (proc.stderr or "")
