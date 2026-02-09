@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from scapy.layers.dns import DNS, DNSQR
 from scapy.layers.inet import IP, UDP
@@ -19,7 +20,7 @@ def _write_small_pcap(path: Path) -> None:
     wrpcap(str(path), [pkt])
 
 
-def test_summary_format_json(tmp_path: Path, capsys) -> None:
+def test_summary_format_json(tmp_path: Path, capsys: Any) -> None:
     pcap = tmp_path / "fixture.pcap"
     _write_small_pcap(pcap)
 
@@ -30,7 +31,7 @@ def test_summary_format_json(tmp_path: Path, capsys) -> None:
     assert parsed["totals"]["flows"] == 1
 
 
-def test_timeline_format_json(tmp_path: Path, capsys) -> None:
+def test_timeline_format_json(tmp_path: Path, capsys: Any) -> None:
     pcap = tmp_path / "fixture.pcap"
     _write_small_pcap(pcap)
 
@@ -42,7 +43,7 @@ def test_timeline_format_json(tmp_path: Path, capsys) -> None:
     assert len(parsed["flows"]) == 1
 
 
-def test_json_alias_conflict_with_format_text(tmp_path: Path, capsys) -> None:
+def test_json_alias_conflict_with_format_text(tmp_path: Path, capsys: Any) -> None:
     pcap = tmp_path / "fixture.pcap"
     _write_small_pcap(pcap)
 
@@ -50,4 +51,3 @@ def test_json_alias_conflict_with_format_text(tmp_path: Path, capsys) -> None:
     assert rc != 0
     err = capsys.readouterr().err
     assert "conflicts" in err
-
