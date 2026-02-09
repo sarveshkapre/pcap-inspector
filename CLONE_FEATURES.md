@@ -8,11 +8,14 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P2: Add `--since-ts/--until-ts` filtering to limit `inspect`/`summary` to a timestamp range.
+- [ ] P1: Add `--since-ts/--until-ts` timestamp-range filtering for `inspect` and `summary` (epoch seconds, inclusive).
+- [ ] P1: Add simple flow filtering flags (`--host`, `--port`, `--proto`) for fast triage without post-processing.
 - [ ] P2: Add event-priority mode (for example rank by flow byte-volume) to complement packet-order `--top-events`.
-- [ ] P2: Add simple flow filtering flags (`--host`, `--port`, `--proto`) for fast triage without post-processing.
-- [ ] P3: Add a compact flow timeline output format for quick conversation sequencing (for example top flows with start/end/duration + event counts).
-- [ ] P3: Improve PCAPNG compatibility story (documented behavior + test fixture; better errors if unsupported).
+- [ ] P2: Add a compact flow timeline output format for quick conversation sequencing (for example top flows with start/end/duration + event counts).
+- [ ] P2: Add `make bench-events` to benchmark DNS/HTTP/TLS extraction paths in addition to flows-only throughput.
+- [ ] P3: Improve PCAPNG compatibility story (detect file type; document behavior; better errors if unsupported).
+- [ ] P3: Add a JSON Schema for `summary --json` output for tooling integration / stability.
+- [ ] P3: Release hygiene: move shipped items into a new version in `CHANGELOG.md`/`RELEASE.md`, and bump version strings.
 
 ## Implemented
 - [x] 2026-02-09 P0: Add a benchmark script + reproducible fixture generator to track `inspect` throughput and memory (RSS).
@@ -59,11 +62,11 @@
 - `--top-flows` is a practical way to control JSONL size for noisy captures without losing event records.
 - `--top-events` now provides independent event-row backpressure for large captures.
 - `--normalize-flows` enables cleaner conversation-centric triage and reduces directional flow duplication in summaries.
-- Market scan (bounded): comparable tools emphasize fast filtering, timelines, and machine-readable exports.
+- Market scan (bounded): comparable tools emphasize time-range filtering, fast field filters, timelines, and machine-readable exports.
   Links:
-  - Wireshark/TShark: JSON output formats enable downstream tooling and automation: https://www.wireshark.org/docs/man-pages/tshark.html
+  - Wireshark: display filters like `frame.time_epoch` enable time-range filtering while iterating captures: https://www.wireshark.org/docs/dfref/f/frame.html
   - Zeek: protocol-aware logs designed for triage at scale (structured logging model): https://docs.zeek.org/en/master/logs/
-  - Arkime: indexing + session timeline UI for browsing large captures: https://arkime.com/
+  - Arkime: indexing + session timeline UI; APIs support `startTime`/`stopTime` for time windows: https://arkime.com/api
   - Suricata: produces JSON (EVE) events for alerts/metadata pipelines: https://docs.suricata.io/en/latest/output/eve/eve-json-format.html
   - Brimcap/Zui: query-centric exploration of PCAP-derived structured data: https://github.com/brimdata/zui
 
