@@ -163,6 +163,7 @@
   - PCAPNG support: `cef202da0b02b5e80a33e6b57de04f588be545ab`
   - TLS port filtering: `22e36dcfa056a2889ab2b6be0e70a2ebc71dca13`
   - CLI `--format` for `summary/timeline`: `fbfc82e4c15cffb6d80ca7964e49b0ebd21fc67a`
+  - Release/doc alignment (`v0.1.3`): `90bc5930f6d0f5d5a043893d8e77c6409ed57d66`
 - Confidence: High
 - Trust Label: trusted
 - Follow-ups:
