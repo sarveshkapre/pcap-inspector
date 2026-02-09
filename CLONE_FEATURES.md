@@ -8,12 +8,15 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P2: Add a `--flows-format` option for `summary` and `timeline` output (text vs JSON) with stable keys for tooling (keep `--json` as an alias).
-- [ ] P2: Add optional TLS port filtering (for example `--tls-ports 443,8443`) to reduce false-positive TLS parsing from arbitrary TCP payloads.
-- [ ] P3: Add PCAPNG support (if feasible) via an alternate reader or conversion fallback; keep current errors as-is when unsupported.
+- [ ] P1: PCAPNG support: read `.pcapng` via Scapy `PcapNgReader` when available; keep actionable errors when parsing fails.
+- [ ] P1: Add optional TLS port filtering (for example `--tls-ports 443,8443`) to reduce false-positive TLS parsing from arbitrary TCP payloads.
+- [ ] P2: Add a `--format` option for `summary` and `timeline` output (`text|json`) with stable keys for tooling (keep `--json` as an alias).
+- [ ] P2: Add `--progress` to emit periodic stderr progress (packets processed, rate, flows, events) for long-running runs.
 - [ ] P3: Add a streaming mode to emit flow rows periodically (not just at end) for very large captures.
-- [ ] P3: Add a `--bpf` or `--filter` option (restricted safe subset) for parity with common PCAP tooling.
-- [ ] P3: Add `--progress` to emit periodic stderr progress (packets processed, rate, flows, events) for long-running runs.
+- [ ] P3: Add a `--bpf` or `--filter` option (restricted safe subset; likely via a conversion/prefilter fallback) for parity with common PCAP tooling.
+- [ ] P3: Add `pcap-inspector schema --timeline` for `timeline --json` output shape.
+- [ ] P3: Add `inspect --dns-ports` to reduce false-positive DNS parsing from arbitrary UDP payloads.
+- [ ] P3: Add `inspect --flows-only` output mode (emit only flow rows; no DNS/HTTP/TLS events) for very fast top-N flow triage.
 
 ## Implemented
 - [x] 2026-02-09 P1: Add `inspect --top-events-mode flow-bytes` to prioritize events from highest-byte flows when `--top-events` is set.
