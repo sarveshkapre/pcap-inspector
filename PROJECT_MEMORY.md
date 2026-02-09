@@ -9,7 +9,7 @@
   - Verification: `make check`; `.venv/bin/python -m pcap_inspector --help` (no Scapy warnings)
 - Commit: `2767abf865490cf666b1ccae09e243f304154932`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
 - Follow-ups:
   - Add timestamp range filtering (`--since-ts/--until-ts`) and compact flow timeline output.
 
@@ -21,7 +21,7 @@
   - Verification: `make bench` (produces JSON with elapsed_s, packets_per_s, maxrss_kb)
 - Commit: `fd1475e6455a0f72fcb5b28ed18317599c490d15`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
 - Follow-ups:
   - Add a second bench mode that includes event extraction (`--top-events`) to track TLS/DNS/HTTP paths too.
 
@@ -34,7 +34,7 @@
   - Verification: `make check`; CLI smoke commands listed in `CLONE_FEATURES.md`
 - Commit: `3b5fe08c98bf3972d829e02be82d4278a4bb6f22`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
 - Follow-ups:
   - Add benchmark fixture/script for throughput and memory regression tracking.
   - Consider event-priority ranking mode beyond packet-order capping.
@@ -47,7 +47,7 @@
   - Process records: `PROJECT_MEMORY.md`, `INCIDENTS.md`
 - Commit: `e87e5709f04bbb30e82d84ee95fc255f21d47289`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
 - Follow-ups:
   - Keep memory entries updated with concrete commit IDs after each ship.
 
@@ -64,7 +64,7 @@
   - Flow filters: `5ba540f98e7fc96ac8aecab91796112ac9839058`
   - PCAPNG/non-PCAP errors: `16d36224725407732cedd3ee747b46027054347d`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
 - Follow-ups:
   - Add a compact flow timeline output mode (top flows with start/end/duration + event counts).
   - Add event-priority mode for `--top-events` beyond packet order.
@@ -77,7 +77,7 @@
   - Verification: `make bench-events` (prints JSON with elapsed_s/packets_per_s/maxrss_kb)
 - Commit: `d8346a657b5208e00cfc8ae2dd6e18f65107c092`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
 
 ## Entry: 2026-02-09-cycle2-release-hygiene-v0-1-1
 - Decision: Consolidate shipped items into `v0.1.1` in release docs and bump version strings.
@@ -88,4 +88,4 @@
   - Verification: `make check`
 - Commit: `2763c2c18e143901416f48cd7aec716bdf797fae`
 - Confidence: High
-- Trust Label: verified-local
+- Trust Label: trusted
