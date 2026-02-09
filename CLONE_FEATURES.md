@@ -8,9 +8,6 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P1: PCAPNG support: read `.pcapng` via Scapy `PcapNgReader` when available; keep actionable errors when parsing fails.
-- [ ] P1: Add optional TLS port filtering (for example `--tls-ports 443,8443`) to reduce false-positive TLS parsing from arbitrary TCP payloads.
-- [ ] P2: Add a `--format` option for `summary` and `timeline` output (`text|json`) with stable keys for tooling (keep `--json` as an alias).
 - [ ] P2: Add `--progress` to emit periodic stderr progress (packets processed, rate, flows, events) for long-running runs.
 - [ ] P3: Add a streaming mode to emit flow rows periodically (not just at end) for very large captures.
 - [ ] P3: Add a `--bpf` or `--filter` option (restricted safe subset; likely via a conversion/prefilter fallback) for parity with common PCAP tooling.
@@ -19,6 +16,12 @@
 - [ ] P3: Add `inspect --flows-only` output mode (emit only flow rows; no DNS/HTTP/TLS events) for very fast top-N flow triage.
 
 ## Implemented
+- [x] 2026-02-09 P1: PCAPNG support: read `.pcapng` inputs via Scapy `PcapNgReader`.
+  Evidence: `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, `CHANGELOG.md`, `ROADMAP.md`
+- [x] 2026-02-09 P1: Add optional TLS port filtering (`--tls-ports`) to reduce false-positive TLS parsing.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, `README.md`, `PROJECT.md`, `PLAN.md`
+- [x] 2026-02-09 P2: Add `summary/timeline --format text|json` (keep `--json` as alias).
+  Evidence: `src/pcap_inspector/cli.py`, `tests/test_cli.py`, `README.md`, `PROJECT.md`
 - [x] 2026-02-09 P1: Add `inspect --top-events-mode flow-bytes` to prioritize events from highest-byte flows when `--top-events` is set.
   Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`, `tests/test_smoke.py`
 - [x] 2026-02-09 P1: Add `inspect --http-ports` to reduce false-positive HTTP parsing from arbitrary TCP payloads.
@@ -84,6 +87,8 @@
 
 ## Insights
 - `main` is currently green in GitHub Actions; no open owner/bot-authored issues are pending.
+- PCAPNG inputs are now supported (via Scapy `PcapNgReader`), removing a common friction point when captures come from modern tooling.
+- `--tls-ports` provides a high-leverage precision knob for TLS metadata extraction, similar to `--http-ports` for HTTP.
 - Rebuilding stream assembly from retained segments materially improves TLS metadata recovery when packets arrive out of order.
 - Packet-limit stats now align with processed packets, making summary output trustworthy for bounded runs.
 - `timeline` provides a lightweight top-conversation sequencing view without producing a full JSONL report.

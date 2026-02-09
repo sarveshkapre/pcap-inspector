@@ -139,3 +139,32 @@
   - Release/doc alignment (remote, via GitHub API ref update): `1bcfd94c29809e18a4712ca4fbdb6ef86050d7eb`
 - Confidence: High
 - Trust Label: trusted
+
+## Entry: 2026-02-09-cycle5-pcapng-tls-ports-and-cli-format
+- Decision: Add PCAPNG input support via Scapy `PcapNgReader`, add `--tls-ports` to scope TLS parsing, and add `summary/timeline --format text|json` (keep `--json` alias).
+- Why: PCAPNG is a common default capture format; supporting it removes a major adoption friction. TLS parsing across arbitrary TCP payloads can produce false positives; port-scoping is a cheap, high-leverage precision knob. A consistent `--format` option makes output selection easier for scripts while preserving backwards compatibility.
+- Evidence:
+  - Code: `src/pcap_inspector/inspector.py`, `src/pcap_inspector/cli.py`
+  - Tests: `tests/test_inspector.py` (pcapng + tls ports), `tests/test_cli.py` (`--format json`)
+  - Docs: `README.md`, `PROJECT.md`, `PLAN.md`, `CHANGELOG.md`, `ROADMAP.md`, `CLONE_FEATURES.md`
+- Verification Evidence:
+  - `make test` (pass)
+  - `make check` (pass)
+  - Smoke:
+    - `.venv/bin/pcap-inspector inspect --pcap bench/fixture-20000p-500f-0b.pcap --out - --no-include-flows --top-events 1 --tls-ports 443 --stats-json` (pass; stats include `tls_ports`)
+    - `.venv/bin/pcap-inspector summary --pcap bench/fixture-20000p-500f-0b.pcap --format json` (pass)
+    - `.venv/bin/pcap-inspector timeline --pcap bench/fixture-20000p-500f-0b.pcap --top 2 --format json` (pass)
+- Mistakes And Fixes:
+  - Root cause: Writing a PCAPNG fixture without a link-layer header caused Scapy to emit 802.3/LLC frames that did not decode into `IP`/`UDP` layers.
+  - Fix: Wrap the synthetic PCAPNG fixture packet with `Ether()/IP/...` so `PcapNgReader` yields decodable packets.
+  - Prevention rule: For PCAPNG fixtures, include an explicit L2 header (for example `Ether()`) so linktype inference produces packets that decode consistently.
+- Commit:
+  - Candidate task refresh: `04d2d3d6215aaeb2cb30da31c269977ad03d2398`
+  - PCAPNG support: `cef202da0b02b5e80a33e6b57de04f588be545ab`
+  - TLS port filtering: `22e36dcfa056a2889ab2b6be0e70a2ebc71dca13`
+  - CLI `--format` for `summary/timeline`: `fbfc82e4c15cffb6d80ca7964e49b0ebd21fc67a`
+- Confidence: High
+- Trust Label: trusted
+- Follow-ups:
+  - Add `--progress` (stderr) for long-running runs.
+  - Consider `schema --timeline` for `timeline --json` consumers.
