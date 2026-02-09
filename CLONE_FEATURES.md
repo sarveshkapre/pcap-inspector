@@ -8,12 +8,15 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P2: Add event-priority mode (for example rank by flow byte-volume) to complement packet-order `--top-events`.
-- [ ] P2: Add an optional HTTP port filter (for example `--http-ports 80,8080`) to reduce false-positive HTTP parsing from arbitrary TCP payloads.
-- [ ] P2: Add a `--flows-format` option for `summary` and `timeline` output (text vs JSON) with stable keys for tooling.
+- [ ] P1 (Selected cycle4): Add `inspect --top-events-mode` to complement packet-order `--top-events` with a flow-ranked option (for example by flow byte-volume).
+- [ ] P1 (Selected cycle4): Add `inspect --http-ports` (for example `80,8080`) to reduce false-positive HTTP parsing from arbitrary TCP payloads.
+- [ ] P1 (Selected cycle4): Release hygiene: bump to `v0.1.2` and align `CHANGELOG.md`/`RELEASE.md`/docs with shipped timeline/CIDR/schema improvements.
+- [ ] P2: Add a `--flows-format` option for `summary` and `timeline` output (text vs JSON) with stable keys for tooling (keep `--json` as an alias).
+- [ ] P2: Add optional TLS port filtering (for example `--tls-ports 443,8443`) to reduce false-positive TLS parsing from arbitrary TCP payloads.
 - [ ] P3: Add PCAPNG support (if feasible) via an alternate reader or conversion fallback; keep current errors as-is when unsupported.
 - [ ] P3: Add a streaming mode to emit flow rows periodically (not just at end) for very large captures.
 - [ ] P3: Add a `--bpf` or `--filter` option (restricted safe subset) for parity with common PCAP tooling.
+- [ ] P3: Add `--progress` to emit periodic stderr progress (packets processed, rate, flows, events) for long-running runs.
 
 ## Implemented
 - [x] 2026-02-09 P1: Add `timeline` command (text + `--json`) to show top conversations with start/end/duration and event counts.
