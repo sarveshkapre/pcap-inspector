@@ -60,9 +60,9 @@
   - Smoke: `.venv/bin/python -m pcap_inspector inspect --pcap bench/fixture-20000p-500f-0b.pcap --out - --max-packets 50 --top-events 3 --top-flows 2 --since-ts 1700000000 --until-ts 1700000000.01 --host 10.0.0.0 --port 53 --proto udp --stats-json`
   - Verification: `make check`
 - Commit:
-  - Timestamp window: `89ece34`
-  - Flow filters: `5ba540f`
-  - PCAPNG/non-PCAP errors: `16d3622`
+  - Timestamp window: `89ece344d8994e4398de096249306eeda50ff78b`
+  - Flow filters: `5ba540f98e7fc96ac8aecab91796112ac9839058`
+  - PCAPNG/non-PCAP errors: `16d36224725407732cedd3ee747b46027054347d`
 - Confidence: High
 - Trust Label: verified-local
 - Follow-ups:
@@ -75,6 +75,17 @@
 - Evidence:
   - Code: `Makefile`, `scripts/bench_inspect.py`, `PROJECT.md`
   - Verification: `make bench-events` (prints JSON with elapsed_s/packets_per_s/maxrss_kb)
-- Commit: `d8346a6`
+- Commit: `d8346a657b5208e00cfc8ae2dd6e18f65107c092`
+- Confidence: High
+- Trust Label: verified-local
+
+## Entry: 2026-02-09-cycle2-release-hygiene-v0-1-1
+- Decision: Consolidate shipped items into `v0.1.1` in release docs and bump version strings.
+- Why: Keep docs aligned with behavior and give users a stable version reference when scripts and options evolve quickly.
+- Evidence:
+  - Docs: `CHANGELOG.md`, `RELEASE.md`, `ROADMAP.md`, `UPDATE.md`, `README.md`
+  - Versioning: `pyproject.toml`, `src/pcap_inspector/cli.py`
+  - Verification: `make check`
+- Commit: `2763c2c18e143901416f48cd7aec716bdf797fae`
 - Confidence: High
 - Trust Label: verified-local
