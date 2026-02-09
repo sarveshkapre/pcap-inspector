@@ -6,5 +6,5 @@
 
 ## Next
 
-- Add benchmark fixture/script for inspect throughput + memory tracking.
 - Flow timeline visualization.
+- Add timestamp range filtering for targeted triage runs.

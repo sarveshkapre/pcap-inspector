@@ -8,10 +8,6 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
-- [ ] P0 (Selected): Add a small benchmark script + reproducible fixture generator to track `inspect` throughput and memory (RSS) across releases.
-- [ ] P0 (Selected): Silence noisy Scapy runtime warnings during CLI usage to keep outputs clean and grep-able.
-- [ ] P0 (Selected): Improve CLI error handling for missing/corrupt PCAP files (no traceback; non-zero exit; actionable message).
-- [ ] P1 (Selected): Add `inspect --include-flow-times` to include per-flow `first_ts`/`last_ts` fields (foundation for flow timeline work).
 - [ ] P2: Add `--since-ts/--until-ts` filtering to limit `inspect`/`summary` to a timestamp range.
 - [ ] P2: Add event-priority mode (for example rank by flow byte-volume) to complement packet-order `--top-events`.
 - [ ] P2: Add simple flow filtering flags (`--host`, `--port`, `--proto`) for fast triage without post-processing.
@@ -19,6 +15,14 @@
 - [ ] P3: Improve PCAPNG compatibility story (documented behavior + test fixture; better errors if unsupported).
 
 ## Implemented
+- [x] 2026-02-09 P0: Add a benchmark script + reproducible fixture generator to track `inspect` throughput and memory (RSS).
+  Evidence: `scripts/bench_inspect.py`, `Makefile` (`make bench`)
+- [x] 2026-02-09 P0: Silence noisy Scapy runtime warnings during CLI usage.
+  Evidence: `src/pcap_inspector/inspector.py`; smoke: `.venv/bin/python -m pcap_inspector --help` (no warnings)
+- [x] 2026-02-09 P0: Improve CLI error handling for missing/corrupt PCAP files (no traceback; actionable message).
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_smoke.py` (`test_missing_pcap_errors_cleanly*`)
+- [x] 2026-02-09 P1: Add `inspect --include-flow-times` to include per-flow `first_ts`/`last_ts` in flow rows.
+  Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `src/pcap_inspector/schema.py`, `tests/test_inspector.py` (`test_inspect_pcap_flow_times`)
 - [x] 2026-02-09 P0: Improved TCP stream reassembly robustness for out-of-order and retransmitted segments.
   Evidence: `src/pcap_inspector/inspector.py`, `tests/test_inspector.py` (`test_inspect_pcap_extracts_tls_sni_out_of_order`)
 - [x] 2026-02-09 P0: Fixed `max_packets` accounting to avoid off-by-one stats in `inspect` and `summary`.

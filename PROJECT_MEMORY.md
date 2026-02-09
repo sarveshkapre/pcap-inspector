@@ -1,5 +1,18 @@
 # PROJECT_MEMORY
 
+## Entry: 2026-02-09-cycle1-clean-cli-errors-and-flow-times
+- Decision: Silence Scapy runtime warnings by default; add clean CLI errors for unreadable PCAPs; add optional flow timestamps via `inspect --include-flow-times`.
+- Why: Keep CLI output clean for piping/grep, avoid traceback-on-user-error, and lay groundwork for future flow timeline features.
+- Evidence:
+  - Code: `src/pcap_inspector/inspector.py`, `src/pcap_inspector/cli.py`, `src/pcap_inspector/schema.py`
+  - Tests: `tests/test_smoke.py` (`test_missing_pcap_errors_cleanly*`), `tests/test_inspector.py` (`test_inspect_pcap_flow_times`)
+  - Verification: `make check`; `.venv/bin/python -m pcap_inspector --help` (no Scapy warnings)
+- Commit: `2767abf865490cf666b1ccae09e243f304154932`
+- Confidence: High
+- Trust Label: verified-local
+- Follow-ups:
+  - Add timestamp range filtering (`--since-ts/--until-ts`) and compact flow timeline output.
+
 ## Entry: 2026-02-09-cycle2-event-volume-and-flow-normalization
 - Decision: Add `inspect --top-events N`, add `--normalize-flows` to `inspect`/`summary`, and unify packet flow-part extraction between code paths.
 - Why: High-volume captures could overwhelm JSONL event output, and directional-only flows made conversation-level triage harder. Shared extraction logic prevents divergence bugs between `inspect` and `summary`.

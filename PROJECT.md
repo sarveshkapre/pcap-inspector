@@ -14,6 +14,12 @@ make setup
 make check
 ```
 
+## Benchmark
+
+```bash
+make bench
+```
+
 ## Run
 
 ```bash

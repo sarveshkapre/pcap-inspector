@@ -1,4 +1,4 @@
-.PHONY: setup dev test lint typecheck build check release
+.PHONY: setup dev test lint typecheck build check bench release
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -27,6 +27,9 @@ build:
 	$(PY) -m compileall -q src
 
 check: lint typecheck test build
+
+bench:
+	$(PY) scripts/bench_inspect.py --packets 50000 --flows 500 --repeat 3 --no-events
 
 release:
 	@echo "Use PROJECT.md for release commands."

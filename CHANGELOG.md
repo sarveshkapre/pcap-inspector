@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `make bench` and a benchmark script to track `inspect` throughput and memory (RSS).
 - Silence noisy Scapy runtime warnings during CLI usage.
 - Improve CLI errors for missing/corrupt PCAP files (no traceback; actionable message).
 - Add `inspect --include-flow-times` to include per-flow `first_ts`/`last_ts` timestamps in flow rows.
