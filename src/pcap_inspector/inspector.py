@@ -376,6 +376,8 @@ def inspect_pcap(
     include_tls: bool = True,
     top_flows: int = 0,
     top_events: int = 0,
+    since_ts: float | None = None,
+    until_ts: float | None = None,
     normalize_flows: bool = False,
     include_flow_times: bool = False,
     stats_out: TextIO | None = None,
@@ -397,13 +399,17 @@ def inspect_pcap(
     with out_ctx as out:
         out = cast(TextIO, out)
         for pkt in _iter_packets(path):
-            if max_packets and packets_seen >= max_packets:
-                break
-            packets_seen += 1
+            pkt_ts = float(getattr(pkt, "time", 0.0))
+            if since_ts is not None and pkt_ts < since_ts:
+                continue
+            if until_ts is not None and pkt_ts > until_ts:
+                continue
             flow_parts = _extract_flow_parts(pkt)
             if flow_parts is None:
                 continue
-            pkt_ts = float(getattr(pkt, "time", 0.0))
+            if max_packets and packets_seen >= max_packets:
+                break
+            packets_seen += 1
             ip_packets += 1
             ip_bytes += len(pkt)
             src, sport, dst, dport, proto = flow_parts
@@ -492,7 +498,7 @@ def inspect_pcap(
             for flow in flow_values:
                 out.write(json.dumps({"type": "flow", **flow.to_dict()}) + "\n")
     if stats_out is not None:
-        stats: dict[str, int | str] = {
+        stats: dict[str, int | str | float | None] = {
             "pcap": str(path),
             "max_packets": max_packets,
             "packets_seen": packets_seen,
@@ -504,6 +510,8 @@ def inspect_pcap(
             "dns_events": dns_events,
             "http_events": http_events,
             "tls_events": tls_events,
+            "since_ts": since_ts,
+            "until_ts": until_ts,
         }
         if stats_json:
             stats_out.write(json.dumps(stats, indent=2) + "\n")
@@ -512,13 +520,15 @@ def inspect_pcap(
     return 0
 
 
-def _write_stats_text(out: TextIO, stats: dict[str, int | str]) -> None:
+def _write_stats_text(out: TextIO, stats: dict[str, int | str | float | None]) -> None:
     out.write("Inspect Stats\n")
     out.write(f"PCAP: {stats['pcap']}\n")
     if stats["max_packets"]:
         out.write(f"Max packets: {stats['max_packets']}\n")
     if stats["top_events"]:
         out.write(f"Max events: {stats['top_events']}\n")
+    if stats.get("since_ts") is not None or stats.get("until_ts") is not None:
+        out.write(f"Time window: {stats.get('since_ts')}..{stats.get('until_ts')}\n")
     out.write(
         "Packets: {packets_seen} (IP: {ip_packets})\n"
         "Flows: {flows}\n"
@@ -535,6 +545,8 @@ def summarize_pcap(
     max_packets: int,
     top_n: int = 10,
     *,
+    since_ts: float | None = None,
+    until_ts: float | None = None,
     normalize_flows: bool = False,
 ) -> dict[str, Any]:
     flows: dict[str, Flow] = {}
@@ -559,17 +571,21 @@ def summarize_pcap(
     udp_flow_keys: set[str] = set()
 
     for pkt in _iter_packets(path):
-        if max_packets and packets_seen >= max_packets:
-            break
-        packets_seen += 1
+        pkt_ts = float(getattr(pkt, "time", 0.0))
+        if since_ts is not None and pkt_ts < since_ts:
+            continue
+        if until_ts is not None and pkt_ts > until_ts:
+            continue
 
         flow_parts = _extract_flow_parts(pkt)
         if flow_parts is None:
             continue
+        if max_packets and packets_seen >= max_packets:
+            break
+        packets_seen += 1
 
         ip_packets += 1
         ip_bytes += len(pkt)
-        pkt_ts = float(getattr(pkt, "time", 0.0))
         if first_ts is None or pkt_ts < first_ts:
             first_ts = pkt_ts
         if last_ts is None or pkt_ts > last_ts:
@@ -644,6 +660,8 @@ def summarize_pcap(
             "duration_s": (last_ts - first_ts)
             if first_ts is not None and last_ts is not None
             else None,
+            "since_ts": since_ts,
+            "until_ts": until_ts,
         },
         "top_dns_qnames": _top_named(dns_qnames, top_n),
         "top_tls_sni": _top_named(tls_sni, top_n),

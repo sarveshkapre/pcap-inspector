@@ -17,6 +17,13 @@ def _non_negative_int(value: str) -> int:
     return parsed
 
 
+def _non_negative_float(value: str) -> float:
+    parsed = float(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be >= 0")
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
     parser.add_argument("--version", action="version", version="0.1.0")
@@ -77,6 +84,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Only include first N event rows (DNS/HTTP/TLS) in packet order (0 = all events)",
     )
     p_run.add_argument(
+        "--since-ts",
+        type=_non_negative_float,
+        default=None,
+        help="Only process packets with ts >= since-ts (seconds since epoch)",
+    )
+    p_run.add_argument(
+        "--until-ts",
+        type=_non_negative_float,
+        default=None,
+        help="Only process packets with ts <= until-ts (seconds since epoch)",
+    )
+    p_run.add_argument(
         "--normalize-flows",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -99,6 +118,18 @@ def main(argv: list[str] | None = None) -> int:
     p_summary.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_summary.add_argument(
         "--top", type=_non_negative_int, default=10, help="Number of top items to show"
+    )
+    p_summary.add_argument(
+        "--since-ts",
+        type=_non_negative_float,
+        default=None,
+        help="Only process packets with ts >= since-ts (seconds since epoch)",
+    )
+    p_summary.add_argument(
+        "--until-ts",
+        type=_non_negative_float,
+        default=None,
+        help="Only process packets with ts <= until-ts (seconds since epoch)",
     )
     p_summary.add_argument(
         "--normalize-flows",
@@ -129,6 +160,12 @@ def _run(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
         return 2
 
+    since_ts = args.since_ts if args.since_ts is not None else None
+    until_ts = args.until_ts if args.until_ts is not None else None
+    if since_ts is not None and until_ts is not None and since_ts > until_ts:
+        sys.stderr.write("error: since-ts must be <= until-ts\n")
+        return 2
+
     stats_out = sys.stderr if args.stats or args.stats_json else None
     out_path = Path(args.out)
     rc = inspect_pcap(
@@ -140,6 +177,8 @@ def _run(args: argparse.Namespace) -> int:
         sort_flows=bool(args.sort_flows),
         top_flows=int(args.top_flows),
         top_events=int(args.top_events),
+        since_ts=since_ts,
+        until_ts=until_ts,
         normalize_flows=bool(args.normalize_flows),
         include_dns=bool(args.include_dns),
         include_http=bool(args.include_http),
@@ -161,10 +200,18 @@ def _summary(args: argparse.Namespace) -> int:
         sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
         return 2
 
+    since_ts = args.since_ts if args.since_ts is not None else None
+    until_ts = args.until_ts if args.until_ts is not None else None
+    if since_ts is not None and until_ts is not None and since_ts > until_ts:
+        sys.stderr.write("error: since-ts must be <= until-ts\n")
+        return 2
+
     summary = summarize_pcap(
         pcap_path,
         max_packets=int(args.max_packets),
         top_n=int(args.top),
+        since_ts=since_ts,
+        until_ts=until_ts,
         normalize_flows=bool(args.normalize_flows),
     )
     if args.json:

@@ -35,6 +35,8 @@ python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --t
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-events 200
 # or normalize directional flows into bidirectional conversations:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --normalize-flows
+# or limit inspection to a time window (epoch seconds):
+python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --since-ts 1700000000 --until-ts 1700003600
 # include per-flow start/end timestamps in flow rows:
 python -m pcap_inspector inspect --pcap capture.pcap --out pcap-report.jsonl --include-flow-times
 # stable ordering for diffing:

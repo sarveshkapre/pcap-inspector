@@ -220,6 +220,69 @@ def test_inspect_pcap_flow_times(tmp_path: Path) -> None:
     assert flow_rows[0]["last_ts"] == 5.0
 
 
+def test_inspect_pcap_time_window_filters_packets(tmp_path: Path) -> None:
+    pkt_a = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    pkt_b = (
+        IP(src="1.1.1.2", dst="8.8.8.8")
+        / UDP(sport=2222, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="b.example"))
+    )
+    pkt_c = (
+        IP(src="1.1.1.3", dst="8.8.8.8")
+        / UDP(sport=3333, dport=53)
+        / DNS(id=3, qr=0, qd=DNSQR(qname="c.example"))
+    )
+    pkt_a.time = 1.0
+    pkt_b.time = 3.0
+    pkt_c.time = 5.0
+    pcap = tmp_path / "time-window.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b, pkt_c])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0, since_ts=2.0, until_ts=4.0)
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    dns_rows = [r for r in rows if r.get("type") == "dns"]
+    flow_rows = [r for r in rows if r.get("type") == "flow"]
+    assert len(dns_rows) == 1
+    assert dns_rows[0]["qname"] == "b.example"
+    assert len(flow_rows) == 1
+    assert flow_rows[0]["packets"] == 1
+
+
+def test_summarize_pcap_time_window_filters_packets(tmp_path: Path) -> None:
+    pkt_a = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    pkt_b = (
+        IP(src="1.1.1.2", dst="8.8.8.8")
+        / UDP(sport=2222, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="b.example"))
+    )
+    pkt_c = (
+        IP(src="1.1.1.3", dst="8.8.8.8")
+        / UDP(sport=3333, dport=53)
+        / DNS(id=3, qr=0, qd=DNSQR(qname="c.example"))
+    )
+    pkt_a.time = 1.0
+    pkt_b.time = 3.0
+    pkt_c.time = 5.0
+    pcap = tmp_path / "summary-time-window.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b, pkt_c])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=10, since_ts=2.0, until_ts=4.0)
+    totals = summary["totals"]
+    assert totals["flows"] == 1
+    assert totals["packets_seen"] == 1
+    assert totals["first_ts"] == 3.0
+    assert totals["last_ts"] == 3.0
+
+
 def test_summarize_pcap(tmp_path: Path) -> None:
     dns_pkt = (
         IP(src="1.1.1.1", dst="8.8.8.8")
