@@ -298,6 +298,84 @@ def test_inspect_pcap_top_flows(tmp_path: Path) -> None:
     assert all(row["flow"] != "10.0.0.1:1000->8.8.8.8:9999 UDP" for row in flow_rows)
 
 
+def test_inspect_pcap_top_events(tmp_path: Path) -> None:
+    dns_pkt_a = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    http_pkt = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    dns_pkt_b = (
+        IP(src="1.1.1.2", dst="8.8.8.8")
+        / UDP(sport=2222, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="b.example"))
+    )
+    pcap = tmp_path / "top-events.pcap"
+    wrpcap(str(pcap), [dns_pkt_a, http_pkt, dns_pkt_b])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0, include_flows=False, top_events=2)
+    events = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert len(events) == 2
+    assert [e["type"] for e in events] == ["dns", "http"]
+
+
+def test_inspect_pcap_normalize_flows(tmp_path: Path) -> None:
+    pkt_a = IP(src="10.0.0.1", dst="10.0.0.2") / UDP(sport=5000, dport=53) / Raw(load=b"x")
+    pkt_b = IP(src="10.0.0.2", dst="10.0.0.1") / UDP(sport=53, dport=5000) / Raw(load=b"y")
+    pcap = tmp_path / "normalize-inspect.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(
+        pcap,
+        out,
+        max_packets=0,
+        include_dns=False,
+        include_http=False,
+        include_tls=False,
+        normalize_flows=True,
+    )
+    flow_rows = [
+        json.loads(line)
+        for line in out.read_text(encoding="utf-8").splitlines()
+        if json.loads(line).get("type") == "flow"
+    ]
+    assert len(flow_rows) == 1
+    assert flow_rows[0]["packets"] == 2
+    assert "<->" in flow_rows[0]["flow"]
+
+
+def test_summarize_pcap_normalize_flows(tmp_path: Path) -> None:
+    pkt_a = IP(src="10.0.0.1", dst="10.0.0.2") / UDP(sport=5000, dport=53) / Raw(load=b"x")
+    pkt_b = IP(src="10.0.0.2", dst="10.0.0.1") / UDP(sport=53, dport=5000) / Raw(load=b"y")
+    pcap = tmp_path / "normalize-summary.pcap"
+    wrpcap(str(pcap), [pkt_a, pkt_b])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=10, normalize_flows=True)
+    assert summary["totals"]["flows"] == 1
+    assert summary["totals"]["udp_flows"] == 1
+    assert "<->" in summary["top_flows_by_bytes"][0]["name"]
+
+
+def test_summarize_pcap_top_flows_tie_breaker(tmp_path: Path) -> None:
+    pkt_b = IP(src="10.0.0.2", dst="8.8.8.8") / UDP(sport=1001, dport=9999) / Raw(load=b"x" * 40)
+    pkt_a = IP(src="10.0.0.1", dst="8.8.8.8") / UDP(sport=1000, dport=9999) / Raw(load=b"x" * 40)
+    pcap = tmp_path / "tie-break.pcap"
+    wrpcap(str(pcap), [pkt_b, pkt_a])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=2)
+    top_names = [item["name"] for item in summary["top_flows_by_bytes"]]
+    assert top_names == [
+        "10.0.0.1:1000->8.8.8.8:9999 UDP",
+        "10.0.0.2:1001->8.8.8.8:9999 UDP",
+    ]
+
+
 def test_inspect_pcap_stats_json(tmp_path: Path) -> None:
     pkt = (
         IP(src="1.1.1.1", dst="8.8.8.8")
@@ -313,3 +391,25 @@ def test_inspect_pcap_stats_json(tmp_path: Path) -> None:
     stats = json.loads(stats_out.getvalue())
     assert stats["flows"] == 1
     assert stats["dns_events"] == 1
+
+
+def test_inspect_pcap_stats_json_includes_event_limit(tmp_path: Path) -> None:
+    dns_pkt_a = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1111, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="a.example"))
+    )
+    dns_pkt_b = (
+        IP(src="1.1.1.2", dst="8.8.8.8")
+        / UDP(sport=2222, dport=53)
+        / DNS(id=2, qr=0, qd=DNSQR(qname="b.example"))
+    )
+    pcap = tmp_path / "stats-top-events.pcap"
+    wrpcap(str(pcap), [dns_pkt_a, dns_pkt_b])
+
+    out = tmp_path / "out.jsonl"
+    stats_out = io.StringIO()
+    inspect_pcap(pcap, out, max_packets=0, top_events=1, stats_out=stats_out, stats_json=True)
+    stats = json.loads(stats_out.getvalue())
+    assert stats["top_events"] == 1
+    assert stats["events_emitted"] == 1

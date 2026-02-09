@@ -29,3 +29,20 @@ def test_invalid_negative_numeric_arg() -> None:
         check=False,
     )
     assert proc.returncode != 0
+
+
+def test_invalid_negative_top_events_arg() -> None:
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pcap_inspector",
+            "inspect",
+            "--pcap",
+            "missing.pcap",
+            "--top-events",
+            "-1",
+        ],
+        check=False,
+    )
+    assert proc.returncode != 0

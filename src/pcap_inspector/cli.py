@@ -65,6 +65,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Only include top N flow rows by bytes (0 = all flows)",
     )
     p_run.add_argument(
+        "--top-events",
+        type=_non_negative_int,
+        default=0,
+        help="Only include first N event rows (DNS/HTTP/TLS) in packet order (0 = all events)",
+    )
+    p_run.add_argument(
+        "--normalize-flows",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Normalize bidirectional flow keys as A:port<->B:port",
+    )
+    p_run.add_argument(
         "--stats",
         action="store_true",
         help="Write a short summary to stderr after inspection",
@@ -81,6 +93,12 @@ def main(argv: list[str] | None = None) -> int:
     p_summary.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_summary.add_argument(
         "--top", type=_non_negative_int, default=10, help="Number of top items to show"
+    )
+    p_summary.add_argument(
+        "--normalize-flows",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Normalize bidirectional flow keys as A:port<->B:port",
     )
     p_summary.add_argument("--json", action="store_true", help="Emit machine-readable JSON")
     p_summary.set_defaults(func=_summary)
@@ -101,6 +119,8 @@ def _run(args: argparse.Namespace) -> int:
         include_flows=bool(args.include_flows),
         sort_flows=bool(args.sort_flows),
         top_flows=int(args.top_flows),
+        top_events=int(args.top_events),
+        normalize_flows=bool(args.normalize_flows),
         include_dns=bool(args.include_dns),
         include_http=bool(args.include_http),
         include_tls=bool(args.include_tls),
@@ -111,7 +131,10 @@ def _run(args: argparse.Namespace) -> int:
 
 def _summary(args: argparse.Namespace) -> int:
     summary = summarize_pcap(
-        Path(args.pcap), max_packets=int(args.max_packets), top_n=int(args.top)
+        Path(args.pcap),
+        max_packets=int(args.max_packets),
+        top_n=int(args.top),
+        normalize_flows=bool(args.normalize_flows),
     )
     if args.json:
         sys.stdout.write(json.dumps(summary, indent=2) + "\n")

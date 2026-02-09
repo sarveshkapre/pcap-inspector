@@ -38,6 +38,28 @@ def _flow_key(src: str, sport: int, dst: str, dport: int, proto: str) -> str:
     return f"{_fmt_hostport(src, sport)}->{_fmt_hostport(dst, dport)} {proto}"
 
 
+def _normalized_flow_key(src: str, sport: int, dst: str, dport: int, proto: str) -> str:
+    left = (src, sport)
+    right = (dst, dport)
+    if right < left:
+        left, right = right, left
+    return f"{_fmt_hostport(left[0], left[1])}<->{_fmt_hostport(right[0], right[1])} {proto}"
+
+
+def _flow_key_with_mode(
+    src: str,
+    sport: int,
+    dst: str,
+    dport: int,
+    proto: str,
+    *,
+    normalize_flows: bool,
+) -> str:
+    if normalize_flows:
+        return _normalized_flow_key(src, sport, dst, dport, proto)
+    return _flow_key(src, sport, dst, dport, proto)
+
+
 def _fmt_hostport(host: str, port: int) -> str:
     if ":" in host:
         return f"[{host}]:{port}"
@@ -78,6 +100,28 @@ def _extract_http(pkt: Any) -> dict[str, Any] | None:
     if method in _HTTP_METHODS and parts[2].startswith(b"HTTP/"):
         return {"type": "http", "request_line": line}
     return None
+
+
+def _extract_flow_parts(pkt: Any) -> tuple[str, int, str, int, str] | None:
+    if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
+        return None
+    ip = pkt[IP] if pkt.haslayer(IP) else pkt[IPv6]
+    proto = "TCP" if pkt.haslayer(TCP) else "UDP" if pkt.haslayer(UDP) else "IP"
+    sport = (
+        int(pkt[TCP].sport)
+        if pkt.haslayer(TCP)
+        else int(pkt[UDP].sport)
+        if pkt.haslayer(UDP)
+        else 0
+    )
+    dport = (
+        int(pkt[TCP].dport)
+        if pkt.haslayer(TCP)
+        else int(pkt[UDP].dport)
+        if pkt.haslayer(UDP)
+        else 0
+    )
+    return str(ip.src), sport, str(ip.dst), dport, proto
 
 
 @dataclass(slots=True)
@@ -305,6 +349,8 @@ def inspect_pcap(
     include_http: bool = True,
     include_tls: bool = True,
     top_flows: int = 0,
+    top_events: int = 0,
+    normalize_flows: bool = False,
     stats_out: TextIO | None = None,
     stats_json: bool = False,
 ) -> int:
@@ -319,6 +365,7 @@ def inspect_pcap(
     dns_events = 0
     http_events = 0
     tls_events = 0
+    events_emitted = 0
     out_ctx = nullcontext(sys.stdout) if use_stdout else out_path.open("w", encoding="utf-8")
     with out_ctx as out:
         out = cast(TextIO, out)
@@ -326,50 +373,51 @@ def inspect_pcap(
             if max_packets and packets_seen >= max_packets:
                 break
             packets_seen += 1
-            if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
+            flow_parts = _extract_flow_parts(pkt)
+            if flow_parts is None:
                 continue
             ip_packets += 1
             ip_bytes += len(pkt)
-            ip = pkt[IP] if pkt.haslayer(IP) else pkt[IPv6]
-            proto = "TCP" if pkt.haslayer(TCP) else "UDP" if pkt.haslayer(UDP) else "IP"
-            sport = (
-                int(pkt[TCP].sport)
-                if pkt.haslayer(TCP)
-                else int(pkt[UDP].sport)
-                if pkt.haslayer(UDP)
-                else 0
+            src, sport, dst, dport, proto = flow_parts
+            stream_key = _flow_key(src, sport, dst, dport, proto)
+            key = _flow_key_with_mode(
+                src,
+                sport,
+                dst,
+                dport,
+                proto,
+                normalize_flows=normalize_flows,
             )
-            dport = (
-                int(pkt[TCP].dport)
-                if pkt.haslayer(TCP)
-                else int(pkt[UDP].dport)
-                if pkt.haslayer(UDP)
-                else 0
-            )
-            key = _flow_key(ip.src, sport, ip.dst, dport, proto)
             prev = flows.get(key)
             if prev:
                 flows[key] = Flow(key, prev.packets + 1, prev.bytes + len(pkt))
             else:
                 flows[key] = Flow(key, 1, len(pkt))
 
-            event: dict[str, Any] | None = None
-            if include_dns:
-                event = _extract_dns(pkt)
-            if event is None and include_http:
-                event = _extract_http(pkt)
-            if event:
-                event["ts"] = float(getattr(pkt, "time", 0.0))
-                event["flow"] = key
-                out.write(json.dumps(event) + "\n")
-                if event.get("type") == "dns":
-                    dns_events += 1
-                elif event.get("type") == "http":
-                    http_events += 1
+            if top_events == 0 or events_emitted < top_events:
+                event: dict[str, Any] | None = None
+                if include_dns:
+                    event = _extract_dns(pkt)
+                if event is None and include_http:
+                    event = _extract_http(pkt)
+                if event:
+                    event["ts"] = float(getattr(pkt, "time", 0.0))
+                    event["flow"] = key
+                    out.write(json.dumps(event) + "\n")
+                    events_emitted += 1
+                    if event.get("type") == "dns":
+                        dns_events += 1
+                    elif event.get("type") == "http":
+                        http_events += 1
 
-            if include_tls and pkt.haslayer(TCP) and pkt.haslayer(Raw):
+            if (
+                (top_events == 0 or events_emitted < top_events)
+                and include_tls
+                and pkt.haslayer(TCP)
+                and pkt.haslayer(Raw)
+            ):
                 payload = bytes(pkt[Raw].load)
-                stream = tcp_streams.setdefault(key, _TcpStream())
+                stream = tcp_streams.setdefault(stream_key, _TcpStream())
                 stream.push(int(pkt[TCP].seq), payload)
                 if not stream.extracted:
                     meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
@@ -387,6 +435,7 @@ def inspect_pcap(
                         )
                         stream.extracted = True
                         tls_events += 1
+                        events_emitted += 1
 
         if include_flows:
             flow_values = list(flows.values())
@@ -406,6 +455,8 @@ def inspect_pcap(
             "ip_packets": ip_packets,
             "ip_bytes": ip_bytes,
             "flows": len(flows),
+            "top_events": top_events,
+            "events_emitted": events_emitted,
             "dns_events": dns_events,
             "http_events": http_events,
             "tls_events": tls_events,
@@ -422,9 +473,12 @@ def _write_stats_text(out: TextIO, stats: dict[str, int | str]) -> None:
     out.write(f"PCAP: {stats['pcap']}\n")
     if stats["max_packets"]:
         out.write(f"Max packets: {stats['max_packets']}\n")
+    if stats["top_events"]:
+        out.write(f"Max events: {stats['top_events']}\n")
     out.write(
         "Packets: {packets_seen} (IP: {ip_packets})\n"
         "Flows: {flows}\n"
+        "Events emitted: {events_emitted}\n"
         "Bytes: {ip_bytes}\n"
         "DNS events: {dns_events}\n"
         "HTTP events: {http_events}\n"
@@ -432,7 +486,13 @@ def _write_stats_text(out: TextIO, stats: dict[str, int | str]) -> None:
     )
 
 
-def summarize_pcap(path: Path, max_packets: int, top_n: int = 10) -> dict[str, Any]:
+def summarize_pcap(
+    path: Path,
+    max_packets: int,
+    top_n: int = 10,
+    *,
+    normalize_flows: bool = False,
+) -> dict[str, Any]:
     flows: dict[str, Flow] = {}
     tcp_streams: dict[str, _TcpStream] = {}
 
@@ -457,29 +517,23 @@ def summarize_pcap(path: Path, max_packets: int, top_n: int = 10) -> dict[str, A
             break
         packets_seen += 1
 
-        if not pkt.haslayer(IP) and not pkt.haslayer(IPv6):
+        flow_parts = _extract_flow_parts(pkt)
+        if flow_parts is None:
             continue
 
         ip_packets += 1
         ip_bytes += len(pkt)
 
-        ip = pkt[IP] if pkt.haslayer(IP) else pkt[IPv6]
-        proto = "TCP" if pkt.haslayer(TCP) else "UDP" if pkt.haslayer(UDP) else "IP"
-        sport = (
-            int(pkt[TCP].sport)
-            if pkt.haslayer(TCP)
-            else int(pkt[UDP].sport)
-            if pkt.haslayer(UDP)
-            else 0
+        src, sport, dst, dport, proto = flow_parts
+        stream_key = _flow_key(src, sport, dst, dport, proto)
+        key = _flow_key_with_mode(
+            src,
+            sport,
+            dst,
+            dport,
+            proto,
+            normalize_flows=normalize_flows,
         )
-        dport = (
-            int(pkt[TCP].dport)
-            if pkt.haslayer(TCP)
-            else int(pkt[UDP].dport)
-            if pkt.haslayer(UDP)
-            else 0
-        )
-        key = _flow_key(ip.src, sport, ip.dst, dport, proto)
         prev = flows.get(key)
         if prev:
             flows[key] = Flow(key, prev.packets + 1, prev.bytes + len(pkt))
@@ -510,7 +564,7 @@ def summarize_pcap(path: Path, max_packets: int, top_n: int = 10) -> dict[str, A
 
         if pkt.haslayer(TCP) and pkt.haslayer(Raw):
             payload = bytes(pkt[Raw].load)
-            stream = tcp_streams.setdefault(key, _TcpStream())
+            stream = tcp_streams.setdefault(stream_key, _TcpStream())
             stream.push(int(pkt[TCP].seq), payload)
             if not stream.extracted:
                 meta = _extract_tls_client_hello_metadata(bytes(stream.assembled))
@@ -552,5 +606,5 @@ def _top_named(counter: Counter[str], top_n: int) -> list[dict[str, object]]:
 def _top_flows_by_bytes(flows: dict[str, Flow], top_n: int) -> list[dict[str, object]]:
     if top_n <= 0:
         return []
-    top = sorted(flows.values(), key=lambda f: f.bytes, reverse=True)[:top_n]
+    top = sorted(flows.values(), key=lambda f: (-f.bytes, f.key))[:top_n]
     return [{"name": f.key, "count": f.bytes} for f in top]
