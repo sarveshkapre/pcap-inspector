@@ -36,11 +36,15 @@ Do not open PRs for this repo; commit directly to `main`.
 - Expand HTTP request extraction to support common methods beyond GET/POST.
 - Fix `max_packets` accounting so packet totals reflect processed packets only.
 - Add regression tests for out-of-order TLS, top-flow filtering, expanded HTTP methods, and packet-limit accounting.
+- Add `inspect --top-events N` to cap DNS/HTTP/TLS event rows in packet order.
+- Add `--normalize-flows` to aggregate bidirectional conversations in both `inspect` and `summary`.
+- Refactor shared flow parsing used by `inspect` and `summary` to reduce behavior drift.
+- Make summary top-flow ordering deterministic when flows have equal byte counts.
 
 ## How to verify
 
 ```bash
 make check
-python -m pcap_inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --stats-json
-python -m pcap_inspector summary --pcap path/to/capture.pcap --json
+python -m pcap_inspector inspect --pcap path/to/capture.pcap --out pcap-report.jsonl --top-flows 20 --top-events 200 --normalize-flows --stats-json
+python -m pcap_inspector summary --pcap path/to/capture.pcap --json --normalize-flows
 ```

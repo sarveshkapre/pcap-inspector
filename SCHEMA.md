@@ -17,7 +17,7 @@ All records include a `type` field.
 Flow summary emitted at the end of `inspect` (unless `--no-include-flows`).
 
 - `type`: `"flow"`
-- `flow`: string (e.g. `1.2.3.4:1234->5.6.7.8:80 TCP` or `[2001:db8::1]:1234->[2001:db8::2]:53 UDP`)
+- `flow`: string (e.g. `1.2.3.4:1234->5.6.7.8:80 TCP`, `[2001:db8::1]:1234->[2001:db8::2]:53 UDP`, or normalized `1.2.3.4:1234<->5.6.7.8:80 TCP` when `--normalize-flows` is enabled)
 - `packets`: integer
 - `bytes`: integer
 
@@ -50,4 +50,3 @@ Best-effort TLS ClientHello parsing from TCP streams.
 - `flow`: string
 - `sni`: string (if present)
 - `alpn`: string[] (if present)
-

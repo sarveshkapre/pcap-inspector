@@ -6,6 +6,5 @@
 
 ## Next
 
-- Improve TCP stream reassembly (more reliable TLS/HTTP parsing).
+- Add benchmark fixture/script for inspect throughput + memory tracking.
 - Flow timeline visualization.
-- Allow omitting flow rows from JSONL (events-only mode).

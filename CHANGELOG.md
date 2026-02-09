@@ -5,6 +5,10 @@
 - Improve TCP stream reassembly handling for out-of-order and retransmitted segments.
 - Fix `max_packets` packet accounting in `inspect` and `summary`.
 - Add `inspect --top-flows N` to include only top flow rows by bytes.
+- Add `inspect --top-events N` to cap emitted DNS/HTTP/TLS event rows.
+- Add optional bidirectional flow normalization via `--normalize-flows`.
+- Refactor shared flow parsing logic used by both `inspect` and `summary`.
+- Make `summary` top-flow ordering deterministic when byte counts tie.
 - Expand HTTP request detection to common methods beyond GET/POST.
 - Add TLS ClientHello SNI/ALPN extraction (best-effort).
 - Support `--out -` to write JSONL to stdout.

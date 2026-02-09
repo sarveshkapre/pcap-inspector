@@ -11,6 +11,8 @@ PCAP Inspector is a minimalist CLI that turns a `.pcap` into JSONL flow summarie
 - HTTP request/status line extraction (best-effort, per packet).
 - TLS ClientHello metadata extraction (best-effort: SNI, ALPN).
 - JSONL output to a file or stdout (`--out -`).
+- Event output capping for high-volume captures (`--top-events`).
+- Optional bidirectional flow normalization (`--normalize-flows`).
 
 ## Top Risks / Unknowns
 
@@ -52,8 +54,12 @@ make typecheck
 - Add `inspect --top-flows N` to include only top flow rows by bytes.
 - Expand HTTP request extraction to include common methods beyond GET/POST.
 - Fix `max_packets` packet accounting to count only processed packets.
+- Add `inspect --top-events N` to bound DNS/HTTP/TLS event rows.
+- Add `--normalize-flows` support in `inspect` and `summary` for conversation-centric triage.
+- Deduplicate inspect/summary packet-flow parsing logic to reduce maintenance drift.
+- Ensure summary top-flow ordering is deterministic on byte-count ties.
 
 ## Next Up (Tight Scope)
 
-- Make TLS/HTTP parsing more reliable with better TCP stream reassembly.
-- Add `--top-events` filters for `inspect` to keep N most relevant events.
+- Add a small benchmark fixture/script to track throughput and memory regressions.
+- Consider flow timeline visualization for top conversations.
