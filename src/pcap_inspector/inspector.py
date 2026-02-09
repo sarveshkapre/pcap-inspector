@@ -90,12 +90,43 @@ def _fmt_hostport(host: str, port: int) -> str:
 
 
 def _iter_packets(path: Path) -> Iterable[Any]:
+    kind = _pcap_kind(path)
     try:
         with PcapReader(str(path)) as reader:
             for pkt in reader:
                 yield pkt
     except Exception as e:  # Scapy throws a variety of exceptions for invalid pcaps.
+        if kind == "pcapng":
+            raise PcapInspectorError(
+                f"failed to read pcapng: {path}: {e} (pcapng may be unsupported; try converting to .pcap)"
+            ) from e
+        if kind == "unknown":
+            raise PcapInspectorError(
+                f"failed to read pcap: {path}: {e} (file does not look like pcap/pcapng)"
+            ) from e
         raise PcapInspectorError(f"failed to read pcap: {path}: {e}") from e
+
+
+def _pcap_kind(path: Path) -> str:
+    try:
+        with path.open("rb") as f:
+            magic = f.read(4)
+    except OSError:
+        return "unknown"
+
+    # PCAPNG starts with the Section Header Block magic.
+    if magic == b"\x0a\x0d\x0d\x0a":
+        return "pcapng"
+
+    # PCAP magic (microsecond + nanosecond variants).
+    if magic in {
+        b"\xd4\xc3\xb2\xa1",
+        b"\xa1\xb2\xc3\xd4",
+        b"\x4d\x3c\xb2\xa1",
+        b"\xa1\xb2\x3c\x4d",
+    }:
+        return "pcap"
+    return "unknown"
 
 
 def _extract_dns(pkt: Any) -> dict[str, Any] | None:

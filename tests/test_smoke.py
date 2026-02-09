@@ -97,3 +97,17 @@ def test_invalid_time_window_rejected(tmp_path: Path) -> None:
     )
     assert proc.returncode != 0
     assert "since-ts must be <=" in (proc.stderr or "")
+
+
+def test_pcapng_errors_cleanly(tmp_path: Path) -> None:
+    pcapng = tmp_path / "fixture.pcapng"
+    pcapng.write_bytes(b"\x0a\x0d\x0d\x0a" + b"\x00" * 64)
+    proc = subprocess.run(
+        [sys.executable, "-m", "pcap_inspector", "inspect", "--pcap", str(pcapng), "--out", "-"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0
+    assert "error:" in (proc.stderr or "")
+    assert "pcapng" in (proc.stderr or "").lower()
