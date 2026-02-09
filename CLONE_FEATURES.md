@@ -22,6 +22,8 @@
   Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `tests/test_inspector.py`
 - [x] 2026-02-09 P1: Release hygiene: bump version to `v0.1.2` and align release docs with shipped features/options.
   Evidence: `pyproject.toml`, `CHANGELOG.md`, `RELEASE.md`, `README.md`, `PROJECT.md`, `PLAN.md`, `ROADMAP.md`, `UPDATE.md`
+- [x] 2026-02-09 P2: CI ergonomics: add `workflow_dispatch` trigger so `ci` can be run manually via GitHub UI/CLI.
+  Evidence: `.github/workflows/ci.yml`
 - [x] 2026-02-09 P1: Add `timeline` command (text + `--json`) to show top conversations with start/end/duration and event counts.
   Evidence: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py` (`timeline_pcap`), `tests/test_inspector.py`, docs in `README.md`
 - [x] 2026-02-09 P1: Extend `--host` filtering to accept CIDR ranges (IPv4 + IPv6), for example `10.0.0.0/8` and `2001:db8::/32`.
