@@ -18,6 +18,7 @@ make check
 
 ```bash
 make bench
+make bench-events
 ```
 
 ## Run
