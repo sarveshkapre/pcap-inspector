@@ -13,6 +13,18 @@
 - Follow-ups:
   - Add timestamp range filtering (`--since-ts/--until-ts`) and compact flow timeline output.
 
+## Entry: 2026-02-09-cycle1-benchmark-harness
+- Decision: Add a lightweight benchmark harness (`make bench`) with a reproducible fixture generator and JSON output.
+- Why: Track throughput and memory regressions across changes without requiring external PCAP artifacts in-repo.
+- Evidence:
+  - Code: `scripts/bench_inspect.py`, `Makefile`, `.gitignore`, `ROADMAP.md`
+  - Verification: `make bench` (produces JSON with elapsed_s, packets_per_s, maxrss_kb)
+- Commit: `fd1475e6455a0f72fcb5b28ed18317599c490d15`
+- Confidence: High
+- Trust Label: verified-local
+- Follow-ups:
+  - Add a second bench mode that includes event extraction (`--top-events`) to track TLS/DNS/HTTP paths too.
+
 ## Entry: 2026-02-09-cycle2-event-volume-and-flow-normalization
 - Decision: Add `inspect --top-events N`, add `--normalize-flows` to `inspect`/`summary`, and unify packet flow-part extraction between code paths.
 - Why: High-volume captures could overwhelm JSONL event output, and directional-only flows made conversation-level triage harder. Shared extraction logic prevents divergence bugs between `inspect` and `summary`.
