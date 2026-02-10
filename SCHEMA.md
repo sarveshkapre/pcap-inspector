@@ -62,3 +62,13 @@ To get the machine-readable JSON Schema:
 ```bash
 pcap-inspector schema --summary > summary.schema.json
 ```
+
+## Timeline JSON Schema (`timeline --json`)
+
+`timeline --json` emits a single JSON object (not JSONL).
+
+To get the machine-readable JSON Schema:
+
+```bash
+pcap-inspector schema --timeline > timeline.schema.json
+```

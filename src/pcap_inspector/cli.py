@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .inspector import PcapInspectorError, inspect_pcap, summarize_pcap, timeline_pcap
-from .schema import JSONL_SCHEMA, SUMMARY_JSON_SCHEMA
+from .schema import JSONL_SCHEMA, SUMMARY_JSON_SCHEMA, TIMELINE_JSON_SCHEMA
 
 
 def _non_negative_int(value: str) -> int:
@@ -295,9 +295,9 @@ def main(argv: list[str] | None = None) -> int:
     p_summary.set_defaults(func=_summary)
 
     p_schema = sub.add_parser("schema", help="Print JSON Schema for JSON output formats")
-    p_schema.add_argument(
-        "--summary", action="store_true", help="Print schema for `summary --json`"
-    )
+    schema_kind = p_schema.add_mutually_exclusive_group(required=False)
+    schema_kind.add_argument("--summary", action="store_true", help="Schema for `summary --json`")
+    schema_kind.add_argument("--timeline", action="store_true", help="Schema for `timeline --json`")
     p_schema.set_defaults(func=_schema)
 
     p_timeline = sub.add_parser(
@@ -506,7 +506,12 @@ def _write_kv_list(title: str, mapping: dict[str, int]) -> None:
 
 
 def _schema(args: argparse.Namespace) -> int:
-    schema = SUMMARY_JSON_SCHEMA if args.summary else JSONL_SCHEMA
+    if args.timeline:
+        schema = TIMELINE_JSON_SCHEMA
+    elif args.summary:
+        schema = SUMMARY_JSON_SCHEMA
+    else:
+        schema = JSONL_SCHEMA
     sys.stdout.write(json.dumps(schema, indent=2, sort_keys=True) + "\n")
     return 0
 

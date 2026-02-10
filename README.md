@@ -82,6 +82,7 @@ make check
 ```bash
 .venv/bin/pcap-inspector schema > inspect-jsonl.schema.json
 .venv/bin/pcap-inspector schema --summary > summary.schema.json
+.venv/bin/pcap-inspector schema --timeline > timeline.schema.json
 ```
 
 See `SCHEMA.md` for documented fields.

@@ -8,12 +8,14 @@
 - GitHub issues and Actions runs (2026-02-09)
 
 ## Candidate Features To Do
+- [ ] P0: Add `pcap-inspector schema --timeline` (and a JSON Schema constant) for `timeline --format json/--json` output.
+- [ ] P0: Add `inspect --flows-only` output mode (emit only flow rows; no DNS/HTTP/TLS events) for very fast top-N flow triage.
+- [ ] P1: Add `--dns-ports` to reduce false-positive DNS parsing from arbitrary UDP payloads (apply consistently across `inspect/summary/timeline`).
 - [ ] P2: Add `--progress` to emit periodic stderr progress (packets processed, rate, flows, events) for long-running runs.
+- [ ] P2: CLI polish: update help/docs to explicitly mention `.pcapng` support wherever `.pcap` is referenced.
 - [ ] P3: Add a streaming mode to emit flow rows periodically (not just at end) for very large captures.
 - [ ] P3: Add a `--bpf` or `--filter` option (restricted safe subset; likely via a conversion/prefilter fallback) for parity with common PCAP tooling.
-- [ ] P3: Add `pcap-inspector schema --timeline` for `timeline --json` output shape.
-- [ ] P3: Add `inspect --dns-ports` to reduce false-positive DNS parsing from arbitrary UDP payloads.
-- [ ] P3: Add `inspect --flows-only` output mode (emit only flow rows; no DNS/HTTP/TLS events) for very fast top-N flow triage.
+- [ ] P3: Add stdin support for PCAP ingestion (`--pcap -`) for pipeline workflows (careful: seek + reader limitations).
 
 ## Implemented
 - [x] 2026-02-09 P1: PCAPNG support: read `.pcapng` inputs via Scapy `PcapNgReader`.
@@ -86,7 +88,7 @@
   Evidence: `.venv/bin/python -m pcap_inspector inspect --top-events 1 --normalize-flows --stats-json`; `.venv/bin/python -m pcap_inspector summary --json --normalize-flows`
 
 ## Insights
-- `main` is currently green in GitHub Actions; no open owner/bot-authored issues are pending.
+- Latest `main` GitHub Actions runs are green (2026-02-09); earlier in the day CI caught regressions in formatting and PCAPNG handling that were subsequently fixed.
 - PCAPNG inputs are now supported (via Scapy `PcapNgReader`), removing a common friction point when captures come from modern tooling.
 - `--tls-ports` provides a high-leverage precision knob for TLS metadata extraction, similar to `--http-ports` for HTTP.
 - Rebuilding stream assembly from retained segments materially improves TLS metadata recovery when packets arrive out of order.
