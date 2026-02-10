@@ -97,11 +97,16 @@ def main(argv: list[str] | None = None) -> int:
 
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("inspect", help="Inspect a PCAP file")
-    p_run.add_argument("--pcap", required=True, help="Path to .pcap file")
+    p_run.add_argument("--pcap", required=True, help="Path to .pcap or .pcapng file")
     p_run.add_argument(
         "--out", default="pcap-report.jsonl", help="Output path (.jsonl) or '-' for stdout"
     )
     p_run.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
+    p_run.add_argument(
+        "--flows-only",
+        action="store_true",
+        help="Emit only flow rows (disables DNS/HTTP/TLS events; implies --include-flows)",
+    )
     p_run.add_argument(
         "--include-flows",
         action=argparse.BooleanOptionalAction,
@@ -170,6 +175,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_run.add_argument(
+        "--dns-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt DNS parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 53,853)"
+        ),
+    )
+    p_run.add_argument(
         "--tls-ports",
         action="append",
         default=[],
@@ -231,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.set_defaults(func=_run)
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
-    p_summary.add_argument("--pcap", required=True, help="Path to .pcap file")
+    p_summary.add_argument("--pcap", required=True, help="Path to .pcap or .pcapng file")
     p_summary.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_summary.add_argument(
         "--top", type=_non_negative_int, default=10, help="Number of top items to show"
@@ -286,6 +300,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_summary.add_argument(
+        "--dns-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt DNS parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 53,853)"
+        ),
+    )
+    p_summary.add_argument(
         "--format",
         choices=["text", "json"],
         default=None,
@@ -303,7 +326,7 @@ def main(argv: list[str] | None = None) -> int:
     p_timeline = sub.add_parser(
         "timeline", help="Print a compact conversation timeline for top flows"
     )
-    p_timeline.add_argument("--pcap", required=True, help="Path to .pcap file")
+    p_timeline.add_argument("--pcap", required=True, help="Path to .pcap or .pcapng file")
     p_timeline.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_timeline.add_argument(
         "--top", type=_non_negative_int, default=20, help="Number of flows to show (0 = all)"
@@ -358,6 +381,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_timeline.add_argument(
+        "--dns-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt DNS parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 53,853)"
+        ),
+    )
+    p_timeline.add_argument(
         "--format",
         choices=["text", "json"],
         default=None,
@@ -397,14 +429,26 @@ def _run(args: argparse.Namespace) -> int:
     hosts = _normalize_host_exact(args.host)
     host_nets = _normalize_host_nets(args.host)
     http_ports = _normalize_ports_csv(args.http_ports)
+    dns_ports = _normalize_ports_csv(args.dns_ports)
     tls_ports = _normalize_ports_csv(args.tls_ports)
     ports = set(args.port)
     protos = _normalize_protos(args.proto)
+
+    include_flows = bool(args.include_flows)
+    include_dns = bool(args.include_dns)
+    include_http = bool(args.include_http)
+    include_tls = bool(args.include_tls)
+    if bool(args.flows_only):
+        include_flows = True
+        include_dns = False
+        include_http = False
+        include_tls = False
+
     rc = inspect_pcap(
         pcap_path,
         out_path,
         int(args.max_packets),
-        include_flows=bool(args.include_flows),
+        include_flows=include_flows,
         include_flow_times=bool(args.include_flow_times),
         sort_flows=bool(args.sort_flows),
         top_flows=int(args.top_flows),
@@ -415,13 +459,14 @@ def _run(args: argparse.Namespace) -> int:
         hosts=hosts if hosts else None,
         host_nets=host_nets if host_nets else None,
         http_ports=http_ports if http_ports else None,
+        dns_ports=dns_ports if dns_ports else None,
         tls_ports=tls_ports if tls_ports else None,
         ports=ports if ports else None,
         protos=protos if protos else None,
         normalize_flows=bool(args.normalize_flows),
-        include_dns=bool(args.include_dns),
-        include_http=bool(args.include_http),
-        include_tls=bool(args.include_tls),
+        include_dns=include_dns,
+        include_http=include_http,
+        include_tls=include_tls,
         stats_out=stats_out,
         stats_json=bool(args.stats_json),
     )
@@ -455,6 +500,7 @@ def _summary(args: argparse.Namespace) -> int:
         host_nets=_normalize_host_nets(args.host) or None,
         ports=set(args.port) or None,
         protos=_normalize_protos(args.proto) or None,
+        dns_ports=_normalize_ports_csv(args.dns_ports) or None,
         tls_ports=_normalize_ports_csv(args.tls_ports) or None,
         normalize_flows=bool(args.normalize_flows),
     )
@@ -545,6 +591,7 @@ def _timeline(args: argparse.Namespace) -> int:
         host_nets=host_nets,
         ports=ports,
         protos=protos,
+        dns_ports=_normalize_ports_csv(args.dns_ports) or None,
         tls_ports=_normalize_ports_csv(args.tls_ports) or None,
         normalize_flows=bool(args.normalize_flows),
     )

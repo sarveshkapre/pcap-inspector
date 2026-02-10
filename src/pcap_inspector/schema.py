@@ -115,6 +115,14 @@ SUMMARY_JSON_SCHEMA: dict[str, Any] = {
                 "host_nets": {"type": ["array", "null"], "items": {"type": "string"}},
                 "ports": {"type": ["array", "null"], "items": {"type": "integer", "minimum": 0}},
                 "protos": {"type": ["array", "null"], "items": {"type": "string"}},
+                "dns_ports": {
+                    "type": ["array", "null"],
+                    "items": {"type": "integer", "minimum": 0},
+                },
+                "tls_ports": {
+                    "type": ["array", "null"],
+                    "items": {"type": "integer", "minimum": 0},
+                },
             },
             "additionalProperties": True,
         },
@@ -208,6 +216,14 @@ TIMELINE_JSON_SCHEMA: dict[str, Any] = {
                 "host_nets": {"type": ["array", "null"], "items": {"type": "string"}},
                 "ports": {"type": ["array", "null"], "items": {"type": "integer", "minimum": 0}},
                 "protos": {"type": ["array", "null"], "items": {"type": "string"}},
+                "dns_ports": {
+                    "type": ["array", "null"],
+                    "items": {"type": "integer", "minimum": 0},
+                },
+                "tls_ports": {
+                    "type": ["array", "null"],
+                    "items": {"type": "integer", "minimum": 0},
+                },
                 "normalize_flows": {"type": "boolean"},
                 "top": {"type": "integer"},
             },

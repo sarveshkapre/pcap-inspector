@@ -486,6 +486,7 @@ def _inspect_pcap_top_events_flow_bytes_mode(
     include_dns: bool,
     include_http: bool,
     include_tls: bool,
+    dns_ports: set[int] | None,
     tls_ports: set[int] | None,
     top_flows: int,
     top_events: int,
@@ -582,7 +583,7 @@ def _inspect_pcap_top_events_flow_bytes_mode(
             continue
 
         event: dict[str, Any] | None = None
-        if include_dns:
+        if include_dns and (dns_ports is None or sport in dns_ports or dport in dns_ports):
             event = _extract_dns(pkt)
         if (
             event is None
@@ -669,6 +670,7 @@ def _inspect_pcap_top_events_flow_bytes_mode(
             "hosts": sorted(hosts) if hosts else None,
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "http_ports": sorted(http_ports) if http_ports else None,
+            "dns_ports": sorted(dns_ports) if dns_ports else None,
             "tls_ports": sorted(tls_ports) if tls_ports else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
@@ -690,6 +692,7 @@ def inspect_pcap(
     include_dns: bool = True,
     include_http: bool = True,
     include_tls: bool = True,
+    dns_ports: set[int] | None = None,
     tls_ports: set[int] | None = None,
     top_flows: int = 0,
     top_events: int = 0,
@@ -719,6 +722,7 @@ def inspect_pcap(
             include_dns=include_dns,
             include_http=include_http,
             include_tls=include_tls,
+            dns_ports=dns_ports,
             tls_ports=tls_ports,
             top_flows=top_flows,
             top_events=top_events,
@@ -808,7 +812,7 @@ def inspect_pcap(
 
             if top_events == 0 or events_emitted < top_events:
                 event: dict[str, Any] | None = None
-                if include_dns:
+                if include_dns and (dns_ports is None or sport in dns_ports or dport in dns_ports):
                     event = _extract_dns(pkt)
                 if (
                     event is None
@@ -881,6 +885,7 @@ def inspect_pcap(
             "hosts": sorted(hosts) if hosts else None,
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "http_ports": sorted(http_ports) if http_ports else None,
+            "dns_ports": sorted(dns_ports) if dns_ports else None,
             "tls_ports": sorted(tls_ports) if tls_ports else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
@@ -941,6 +946,7 @@ def summarize_pcap(
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
+    dns_ports: set[int] | None = None,
     tls_ports: set[int] | None = None,
     normalize_flows: bool = False,
 ) -> dict[str, Any]:
@@ -1015,7 +1021,11 @@ def summarize_pcap(
         elif proto == "UDP":
             udp_flow_keys.add(key)
 
-        dns = _extract_dns(pkt)
+        dns = (
+            _extract_dns(pkt)
+            if dns_ports is None or sport in dns_ports or dport in dns_ports
+            else None
+        )
         if dns and dns.get("qname"):
             dns_qnames[str(dns["qname"])] += 1
 
@@ -1071,6 +1081,8 @@ def summarize_pcap(
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
+            "dns_ports": sorted(dns_ports) if dns_ports else None,
+            "tls_ports": sorted(tls_ports) if tls_ports else None,
         },
         "top_dns_qnames": _top_named(dns_qnames, top_n),
         "top_tls_sni": _top_named(tls_sni, top_n),
@@ -1130,6 +1142,7 @@ def timeline_pcap(
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
+    dns_ports: set[int] | None = None,
     tls_ports: set[int] | None = None,
     normalize_flows: bool = False,
 ) -> dict[str, Any]:
@@ -1184,8 +1197,9 @@ def timeline_pcap(
         timeline = flows.setdefault(key, _FlowTimeline(key))
         timeline.add_packet(len(pkt), pkt_ts)
 
-        if _extract_dns(pkt):
-            timeline.dns_events += 1
+        if dns_ports is None or sport in dns_ports or dport in dns_ports:
+            if _extract_dns(pkt):
+                timeline.dns_events += 1
 
         if _extract_http(pkt):
             timeline.http_events += 1
@@ -1229,6 +1243,8 @@ def timeline_pcap(
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
+            "dns_ports": sorted(dns_ports) if dns_ports else None,
+            "tls_ports": sorted(tls_ports) if tls_ports else None,
             "normalize_flows": normalize_flows,
             "top": top_n,
         },

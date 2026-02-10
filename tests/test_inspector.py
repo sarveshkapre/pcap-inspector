@@ -181,6 +181,35 @@ def test_inspect_pcap_event_filters(tmp_path: Path) -> None:
     assert not any(e.get("type") == "tls" for e in events)
 
 
+def test_inspect_pcap_dns_ports_filter_excludes_dns(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    pcap = tmp_path / "dns.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    out = tmp_path / "out.jsonl"
+    inspect_pcap(pcap, out, max_packets=0, include_flows=False, dns_ports={54})
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert not any(json.loads(line).get("type") == "dns" for line in lines)
+
+
+def test_summarize_pcap_dns_ports_filter_excludes_dns(tmp_path: Path) -> None:
+    pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    pcap = tmp_path / "dns.pcap"
+    wrpcap(str(pcap), [pkt])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=10, dns_ports={54})
+    assert summary["totals"]["dns_queries"] == 0
+    assert summary["top_dns_qnames"] == []
+
+
 def test_inspect_pcap_sort_flows(tmp_path: Path) -> None:
     pkt_a = (
         IP(src="1.1.1.1", dst="8.8.8.8")

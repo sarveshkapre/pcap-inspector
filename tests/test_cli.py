@@ -51,3 +51,15 @@ def test_json_alias_conflict_with_format_text(tmp_path: Path, capsys: Any) -> No
     assert rc != 0
     err = capsys.readouterr().err
     assert "conflicts" in err
+
+
+def test_inspect_flows_only_emits_only_flow_rows(tmp_path: Path, capsys: Any) -> None:
+    pcap = tmp_path / "fixture.pcap"
+    _write_small_pcap(pcap)
+
+    rc = main(["inspect", "--pcap", str(pcap), "--out", "-", "--flows-only"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    rows = [json.loads(line) for line in out.splitlines() if line.strip()]
+    assert rows
+    assert all(row.get("type") == "flow" for row in rows)

@@ -37,6 +37,8 @@ make bench-events
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --no-include-flows
 # or filter event types:
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --no-include-http --no-include-tls
+# or emit only flow summary rows (no DNS/HTTP/TLS events):
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --flows-only
 # or keep only the top 20 flows by bytes in flow rows:
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --top-flows 20
 # or cap event rows for large captures:
@@ -51,6 +53,8 @@ make bench-events
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl --host 10.0.0.5 --port 443 --proto tcp
 # or only attempt HTTP parsing on specific ports (reduce false positives):
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --http-ports 80,8080
+# or only attempt DNS parsing on specific ports (reduce false positives):
+.venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --dns-ports 53,853
 # or only attempt TLS parsing on specific ports (reduce false positives):
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --tls-ports 443,8443
 # include per-flow start/end timestamps in flow rows:

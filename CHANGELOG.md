@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Restricted `--bpf` / `--filter` option for parity with common PCAP tooling.
+- Add `inspect --flows-only` for fast flow-only triage.
+- Add `--dns-ports` for `inspect/summary/timeline` to reduce false-positive DNS parsing.
+- Add `pcap-inspector schema --timeline` for `timeline --json` output shape.
 
 ## v0.1.3 - 2026-02-09
 
