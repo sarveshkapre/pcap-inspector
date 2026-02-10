@@ -29,6 +29,8 @@ make bench-events
 
 ## Example
 
+`--pcap` accepts both `.pcap` and `.pcapng`.
+
 ```bash
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl
 # or stream JSONL to stdout:

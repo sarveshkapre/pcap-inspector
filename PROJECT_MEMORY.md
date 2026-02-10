@@ -169,3 +169,25 @@
 - Follow-ups:
   - Add `--progress` (stderr) for long-running runs.
   - Consider `schema --timeline` for `timeline --json` consumers.
+
+## Entry: 2026-02-10-cycle6-timeline-schema-and-dns-port-scoping
+- Decision: Add `schema --timeline` for machine-readable `timeline --json`, add `inspect --flows-only`, and add `--dns-ports` port scoping for DNS extraction across `inspect/summary/timeline` (and record filter settings in JSON totals/stats).
+- Why: Schemas reduce downstream tooling risk, flows-only is a common fast-triage mode, and port-scoping DNS reduces false positives from arbitrary payload decoding while preserving backwards-compatible defaults.
+- Evidence:
+  - Code: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `src/pcap_inspector/schema.py`
+  - Tests: `tests/test_smoke.py` (`schema --timeline`), `tests/test_cli.py` (`--flows-only`), `tests/test_inspector.py` (`dns_ports`)
+  - Docs: `README.md`, `PROJECT.md`, `SCHEMA.md`, `CHANGELOG.md`, `CLONE_FEATURES.md`
+- Verification Evidence:
+  - `make check` (pass)
+  - Smoke (generated 1-packet DNS PCAP via Scapy):
+    - `.venv/bin/pcap-inspector inspect --pcap "$TMPDIR/smoke.pcap" --out - --flows-only --stats-json` (pass; JSONL contains only `type=flow`)
+    - `.venv/bin/pcap-inspector summary --pcap "$TMPDIR/smoke.pcap" --format json --dns-ports 53` (pass; totals include `dns_ports: [53]`)
+    - `.venv/bin/pcap-inspector timeline --pcap "$TMPDIR/smoke.pcap" --top 5 --format json --dns-ports 53` (pass)
+- Commit:
+  - `schema --timeline`: `9ec6c2381a4e9fa6b22aa2ce0eae5a8a7fe9646b`
+  - `--flows-only` + `--dns-ports`: `d6b7e3f8d2255c8752ea62e5f43bc874767c6f90`
+- Confidence: High
+- Trust Label: trusted
+- Follow-ups:
+  - Add `--progress` (stderr) for long-running runs.
+  - Evaluate a restricted `--bpf/--filter` subset (likely via prefilter fallback) for parity with tcpdump/tshark capture filters.
