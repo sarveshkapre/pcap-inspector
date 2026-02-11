@@ -6,6 +6,8 @@
 - Add `inspect --flows-only` for fast flow-only triage.
 - Add `--dns-ports` for `inspect/summary/timeline` to reduce false-positive DNS parsing.
 - Add `pcap-inspector schema --timeline` for `timeline --json` output shape.
+- Add stdin PCAP ingestion (`--pcap -`) across `inspect`, `summary`, and `timeline`.
+- Add `--http-ports` to `summary` and `timeline` for HTTP parsing precision parity with `inspect`.
 
 ## v0.1.3 - 2026-02-09
 

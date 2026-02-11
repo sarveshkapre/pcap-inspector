@@ -29,12 +29,14 @@ make bench-events
 
 ## Example
 
-`--pcap` accepts both `.pcap` and `.pcapng`.
+`--pcap` accepts `.pcap`, `.pcapng`, or `-` (stdin).
 
 ```bash
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl
 # or stream JSONL to stdout:
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out -
+# or read capture bytes from stdin:
+cat capture.pcap | .venv/bin/pcap-inspector inspect --pcap - --out -
 # or omit flow summary rows (events-only):
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --no-include-flows
 # or filter event types:
@@ -76,6 +78,7 @@ make bench-events
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --normalize-flows
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --since-ts 1700000000 --until-ts 1700003600
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --host 10.0.0.5 --port 443 --proto tcp
+.venv/bin/pcap-inspector summary --pcap capture.pcap --json --http-ports 80,8080
 ```
 
 ## Timeline
@@ -84,6 +87,7 @@ make bench-events
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --json
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --format json
+.venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --format json --http-ports 80,8080
 ```
 
 ## Schema

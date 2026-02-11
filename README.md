@@ -6,9 +6,11 @@ Minimal PCAP analyzer that extracts flow summaries and basic DNS/HTTP metadata.
 
 - Flow summary (src/dst/ports/proto).
 - PCAP + PCAPNG input support.
+- Stdin PCAP ingestion support (`--pcap -`) for pipeline workflows.
 - IPv4 + IPv6 support.
 - DNS query metadata.
 - HTTP request/response line extraction (best-effort).
+- Optional HTTP port filtering for all analysis commands (`--http-ports`) to reduce false positives.
 - TLS ClientHello SNI/ALPN extraction (best-effort).
 - Optional TLS port filtering (`--tls-ports`) to reduce false positives.
 - Timestamp window filtering (`--since-ts/--until-ts`) for targeted triage runs.
@@ -26,12 +28,14 @@ make check
 
 ## Usage
 
-`--pcap` accepts both `.pcap` and `.pcapng`.
+`--pcap` accepts `.pcap`, `.pcapng`, or `-` (read from stdin).
 
 ```bash
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out pcap-report.jsonl
 # or stream JSONL to stdout:
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out -
+# or read capture bytes from stdin:
+cat capture.pcap | .venv/bin/pcap-inspector inspect --pcap - --out -
 # or omit flow summary rows (events-only):
 .venv/bin/pcap-inspector inspect --pcap capture.pcap --out - --no-include-flows
 # or filter event types:
@@ -73,6 +77,7 @@ make check
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json
 .venv/bin/pcap-inspector summary --pcap capture.pcap --format json
 .venv/bin/pcap-inspector summary --pcap capture.pcap --json --normalize-flows
+.venv/bin/pcap-inspector summary --pcap capture.pcap --json --http-ports 80,8080
 ```
 
 ## Timeline
@@ -81,6 +86,7 @@ make check
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --json
 .venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --format json
+.venv/bin/pcap-inspector timeline --pcap capture.pcap --top 20 --format json --http-ports 80,8080
 ```
 
 ## Schemas

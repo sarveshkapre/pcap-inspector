@@ -946,6 +946,7 @@ def summarize_pcap(
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
+    http_ports: set[int] | None = None,
     dns_ports: set[int] | None = None,
     tls_ports: set[int] | None = None,
     normalize_flows: bool = False,
@@ -1029,7 +1030,11 @@ def summarize_pcap(
         if dns and dns.get("qname"):
             dns_qnames[str(dns["qname"])] += 1
 
-        http = _extract_http(pkt)
+        http = (
+            _extract_http(pkt)
+            if http_ports is None or sport in http_ports or dport in http_ports
+            else None
+        )
         if http:
             if "request_line" in http:
                 http_requests += 1
@@ -1081,6 +1086,7 @@ def summarize_pcap(
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
+            "http_ports": sorted(http_ports) if http_ports else None,
             "dns_ports": sorted(dns_ports) if dns_ports else None,
             "tls_ports": sorted(tls_ports) if tls_ports else None,
         },
@@ -1142,6 +1148,7 @@ def timeline_pcap(
     host_nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] | None = None,
     ports: set[int] | None = None,
     protos: set[str] | None = None,
+    http_ports: set[int] | None = None,
     dns_ports: set[int] | None = None,
     tls_ports: set[int] | None = None,
     normalize_flows: bool = False,
@@ -1201,7 +1208,9 @@ def timeline_pcap(
             if _extract_dns(pkt):
                 timeline.dns_events += 1
 
-        if _extract_http(pkt):
+        if (http_ports is None or sport in http_ports or dport in http_ports) and _extract_http(
+            pkt
+        ):
             timeline.http_events += 1
 
         if pkt.haslayer(TCP) and pkt.haslayer(Raw):
@@ -1243,6 +1252,7 @@ def timeline_pcap(
             "host_nets": [str(net) for net in host_nets] if host_nets else None,
             "ports": sorted(ports) if ports else None,
             "protos": sorted(protos) if protos else None,
+            "http_ports": sorted(http_ports) if http_ports else None,
             "dns_ports": sorted(dns_ports) if dns_ports else None,
             "tls_ports": sorted(tls_ports) if tls_ports else None,
             "normalize_flows": normalize_flows,

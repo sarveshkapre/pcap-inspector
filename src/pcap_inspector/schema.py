@@ -115,6 +115,10 @@ SUMMARY_JSON_SCHEMA: dict[str, Any] = {
                 "host_nets": {"type": ["array", "null"], "items": {"type": "string"}},
                 "ports": {"type": ["array", "null"], "items": {"type": "integer", "minimum": 0}},
                 "protos": {"type": ["array", "null"], "items": {"type": "string"}},
+                "http_ports": {
+                    "type": ["array", "null"],
+                    "items": {"type": "integer", "minimum": 0},
+                },
                 "dns_ports": {
                     "type": ["array", "null"],
                     "items": {"type": "integer", "minimum": 0},
@@ -216,6 +220,10 @@ TIMELINE_JSON_SCHEMA: dict[str, Any] = {
                 "host_nets": {"type": ["array", "null"], "items": {"type": "string"}},
                 "ports": {"type": ["array", "null"], "items": {"type": "integer", "minimum": 0}},
                 "protos": {"type": ["array", "null"], "items": {"type": "string"}},
+                "http_ports": {
+                    "type": ["array", "null"],
+                    "items": {"type": "integer", "minimum": 0},
+                },
                 "dns_ports": {
                     "type": ["array", "null"],
                     "items": {"type": "integer", "minimum": 0},

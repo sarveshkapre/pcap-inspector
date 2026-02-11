@@ -1,8 +1,22 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
+
+from scapy.layers.dns import DNS, DNSQR
+from scapy.layers.inet import IP, UDP
+from scapy.utils import wrpcap
+
+
+def _write_small_pcap(path: Path) -> None:
+    pkt = (
+        IP(src="1.1.1.1", dst="8.8.8.8")
+        / UDP(sport=1234, dport=53)
+        / DNS(id=1, qr=0, qd=DNSQR(qname="example.com"))
+    )
+    wrpcap(str(path), [pkt])
 
 
 def test_help() -> None:
@@ -157,3 +171,76 @@ def test_top_events_mode_requires_top_events(tmp_path: Path) -> None:
     )
     assert proc.returncode != 0
     assert "--top-events-mode requires --top-events" in (proc.stderr or "")
+
+
+def test_inspect_accepts_stdin_pcap(tmp_path: Path) -> None:
+    pcap = tmp_path / "stdin.pcap"
+    _write_small_pcap(pcap)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pcap_inspector",
+            "inspect",
+            "--pcap",
+            "-",
+            "--out",
+            "-",
+            "--flows-only",
+        ],
+        input=pcap.read_bytes(),
+        check=False,
+        capture_output=True,
+    )
+    assert proc.returncode == 0
+    rows = [json.loads(line) for line in (proc.stdout or b"").decode().splitlines() if line.strip()]
+    assert rows
+    assert all(row.get("type") == "flow" for row in rows)
+
+
+def test_summary_accepts_stdin_pcap(tmp_path: Path) -> None:
+    pcap = tmp_path / "stdin-summary.pcap"
+    _write_small_pcap(pcap)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pcap_inspector",
+            "summary",
+            "--pcap",
+            "-",
+            "--format",
+            "json",
+        ],
+        input=pcap.read_bytes(),
+        check=False,
+        capture_output=True,
+    )
+    assert proc.returncode == 0
+    summary = json.loads((proc.stdout or b"").decode())
+    assert summary["totals"]["flows"] == 1
+
+
+def test_timeline_accepts_stdin_pcap(tmp_path: Path) -> None:
+    pcap = tmp_path / "stdin-timeline.pcap"
+    _write_small_pcap(pcap)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pcap_inspector",
+            "timeline",
+            "--pcap",
+            "-",
+            "--top",
+            "1",
+            "--format",
+            "json",
+        ],
+        input=pcap.read_bytes(),
+        check=False,
+        capture_output=True,
+    )
+    assert proc.returncode == 0
+    timeline = json.loads((proc.stdout or b"").decode())
+    assert timeline["totals"]["flows"] == 1

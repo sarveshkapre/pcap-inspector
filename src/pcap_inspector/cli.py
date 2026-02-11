@@ -4,11 +4,15 @@ import argparse
 import json
 import sys
 import ipaddress
-from collections.abc import Sequence
+import tempfile
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 
 from .inspector import PcapInspectorError, inspect_pcap, summarize_pcap, timeline_pcap
 from .schema import JSONL_SCHEMA, SUMMARY_JSON_SCHEMA, TIMELINE_JSON_SCHEMA
+
+_STDIN_CHUNK_BYTES = 1024 * 1024
 
 
 def _non_negative_int(value: str) -> int:
@@ -91,13 +95,46 @@ def _normalize_ports_csv(values: Sequence[str]) -> set[int]:
     return out
 
 
+@contextmanager
+def _resolve_pcap_path(value: str) -> Iterator[Path]:
+    if value != "-":
+        pcap_path = Path(value)
+        if not pcap_path.exists():
+            raise PcapInspectorError(f"pcap not found: {pcap_path}")
+        if not pcap_path.is_file():
+            raise PcapInspectorError(f"pcap is not a file: {pcap_path}")
+        yield pcap_path
+        return
+
+    with tempfile.NamedTemporaryFile(
+        prefix="pcap-inspector-stdin-",
+        suffix=".pcap",
+        delete=False,
+    ) as tmp:
+        tmp_path = Path(tmp.name)
+        total_bytes = 0
+        while True:
+            chunk = sys.stdin.buffer.read(_STDIN_CHUNK_BYTES)
+            if not chunk:
+                break
+            tmp.write(chunk)
+            total_bytes += len(chunk)
+
+    try:
+        if total_bytes == 0:
+            raise PcapInspectorError("stdin did not contain pcap/pcapng bytes")
+        yield tmp_path
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pcap-inspector")
     parser.add_argument("--version", action="version", version="0.1.3")
 
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("inspect", help="Inspect a PCAP file")
-    p_run.add_argument("--pcap", required=True, help="Path to .pcap or .pcapng file")
+    p_run.add_argument("--pcap", required=True, help="Path to .pcap/.pcapng file or '-' for stdin")
     p_run.add_argument(
         "--out", default="pcap-report.jsonl", help="Output path (.jsonl) or '-' for stdout"
     )
@@ -245,7 +282,9 @@ def main(argv: list[str] | None = None) -> int:
     p_run.set_defaults(func=_run)
 
     p_summary = sub.add_parser("summary", help="Print an aggregate summary (no JSONL output)")
-    p_summary.add_argument("--pcap", required=True, help="Path to .pcap or .pcapng file")
+    p_summary.add_argument(
+        "--pcap", required=True, help="Path to .pcap/.pcapng file or '-' for stdin"
+    )
     p_summary.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_summary.add_argument(
         "--top", type=_non_negative_int, default=10, help="Number of top items to show"
@@ -309,6 +348,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_summary.add_argument(
+        "--http-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt HTTP parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 80,8080)"
+        ),
+    )
+    p_summary.add_argument(
         "--format",
         choices=["text", "json"],
         default=None,
@@ -326,7 +374,9 @@ def main(argv: list[str] | None = None) -> int:
     p_timeline = sub.add_parser(
         "timeline", help="Print a compact conversation timeline for top flows"
     )
-    p_timeline.add_argument("--pcap", required=True, help="Path to .pcap or .pcapng file")
+    p_timeline.add_argument(
+        "--pcap", required=True, help="Path to .pcap/.pcapng file or '-' for stdin"
+    )
     p_timeline.add_argument("--max-packets", type=_non_negative_int, default=0, help="0 = no limit")
     p_timeline.add_argument(
         "--top", type=_non_negative_int, default=20, help="Number of flows to show (0 = all)"
@@ -390,6 +440,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p_timeline.add_argument(
+        "--http-ports",
+        action="append",
+        default=[],
+        help=(
+            "Only attempt HTTP parsing when sport or dport matches one of these ports "
+            "(repeatable; comma-separated; example: 80,8080)"
+        ),
+    )
+    p_timeline.add_argument(
         "--format",
         choices=["text", "json"],
         default=None,
@@ -407,14 +466,6 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
-    pcap_path = Path(args.pcap)
-    if not pcap_path.exists():
-        sys.stderr.write(f"error: pcap not found: {pcap_path}\n")
-        return 2
-    if not pcap_path.is_file():
-        sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
-        return 2
-
     since_ts = args.since_ts if args.since_ts is not None else None
     until_ts = args.until_ts if args.until_ts is not None else None
     if since_ts is not None and until_ts is not None and since_ts > until_ts:
@@ -444,66 +495,61 @@ def _run(args: argparse.Namespace) -> int:
         include_http = False
         include_tls = False
 
-    rc = inspect_pcap(
-        pcap_path,
-        out_path,
-        int(args.max_packets),
-        include_flows=include_flows,
-        include_flow_times=bool(args.include_flow_times),
-        sort_flows=bool(args.sort_flows),
-        top_flows=int(args.top_flows),
-        top_events=int(args.top_events),
-        top_events_mode=str(args.top_events_mode),
-        since_ts=since_ts,
-        until_ts=until_ts,
-        hosts=hosts if hosts else None,
-        host_nets=host_nets if host_nets else None,
-        http_ports=http_ports if http_ports else None,
-        dns_ports=dns_ports if dns_ports else None,
-        tls_ports=tls_ports if tls_ports else None,
-        ports=ports if ports else None,
-        protos=protos if protos else None,
-        normalize_flows=bool(args.normalize_flows),
-        include_dns=include_dns,
-        include_http=include_http,
-        include_tls=include_tls,
-        stats_out=stats_out,
-        stats_json=bool(args.stats_json),
-    )
+    with _resolve_pcap_path(args.pcap) as pcap_path:
+        rc = inspect_pcap(
+            pcap_path,
+            out_path,
+            int(args.max_packets),
+            include_flows=include_flows,
+            include_flow_times=bool(args.include_flow_times),
+            sort_flows=bool(args.sort_flows),
+            top_flows=int(args.top_flows),
+            top_events=int(args.top_events),
+            top_events_mode=str(args.top_events_mode),
+            since_ts=since_ts,
+            until_ts=until_ts,
+            hosts=hosts if hosts else None,
+            host_nets=host_nets if host_nets else None,
+            http_ports=http_ports if http_ports else None,
+            dns_ports=dns_ports if dns_ports else None,
+            tls_ports=tls_ports if tls_ports else None,
+            ports=ports if ports else None,
+            protos=protos if protos else None,
+            normalize_flows=bool(args.normalize_flows),
+            include_dns=include_dns,
+            include_http=include_http,
+            include_tls=include_tls,
+            stats_out=stats_out,
+            stats_json=bool(args.stats_json),
+        )
     if out_path.as_posix() != "-":
         sys.stdout.write(f"wrote {out_path}\n")
     return rc
 
 
 def _summary(args: argparse.Namespace) -> int:
-    pcap_path = Path(args.pcap)
-    if not pcap_path.exists():
-        sys.stderr.write(f"error: pcap not found: {pcap_path}\n")
-        return 2
-    if not pcap_path.is_file():
-        sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
-        return 2
-
     since_ts = args.since_ts if args.since_ts is not None else None
     until_ts = args.until_ts if args.until_ts is not None else None
     if since_ts is not None and until_ts is not None and since_ts > until_ts:
         sys.stderr.write("error: since-ts must be <= until-ts\n")
         return 2
 
-    summary = summarize_pcap(
-        pcap_path,
-        max_packets=int(args.max_packets),
-        top_n=int(args.top),
-        since_ts=since_ts,
-        until_ts=until_ts,
-        hosts=_normalize_host_exact(args.host) or None,
-        host_nets=_normalize_host_nets(args.host) or None,
-        ports=set(args.port) or None,
-        protos=_normalize_protos(args.proto) or None,
-        dns_ports=_normalize_ports_csv(args.dns_ports) or None,
-        tls_ports=_normalize_ports_csv(args.tls_ports) or None,
-        normalize_flows=bool(args.normalize_flows),
-    )
+    with _resolve_pcap_path(args.pcap) as pcap_path:
+        summary = summarize_pcap(
+            pcap_path,
+            max_packets=int(args.max_packets),
+            top_n=int(args.top),
+            since_ts=since_ts,
+            until_ts=until_ts,
+            hosts=_normalize_host_exact(args.host) or None,
+            host_nets=_normalize_host_nets(args.host) or None,
+            ports=set(args.port) or None,
+            protos=_normalize_protos(args.proto) or None,
+            http_ports=_normalize_ports_csv(args.http_ports) or None,
+            dns_ports=_normalize_ports_csv(args.dns_ports) or None,
+            tls_ports=_normalize_ports_csv(args.tls_ports) or None,
+            normalize_flows=bool(args.normalize_flows),
+        )
     fmt = str(args.format) if args.format is not None else None
     if args.json:
         if fmt is not None and fmt != "json":
@@ -563,14 +609,6 @@ def _schema(args: argparse.Namespace) -> int:
 
 
 def _timeline(args: argparse.Namespace) -> int:
-    pcap_path = Path(args.pcap)
-    if not pcap_path.exists():
-        sys.stderr.write(f"error: pcap not found: {pcap_path}\n")
-        return 2
-    if not pcap_path.is_file():
-        sys.stderr.write(f"error: pcap is not a file: {pcap_path}\n")
-        return 2
-
     since_ts = args.since_ts if args.since_ts is not None else None
     until_ts = args.until_ts if args.until_ts is not None else None
     if since_ts is not None and until_ts is not None and since_ts > until_ts:
@@ -581,20 +619,22 @@ def _timeline(args: argparse.Namespace) -> int:
     host_nets = _normalize_host_nets(args.host) or None
     ports = set(args.port) or None
     protos = _normalize_protos(args.proto) or None
-    timeline = timeline_pcap(
-        pcap_path,
-        max_packets=int(args.max_packets),
-        top_n=int(args.top),
-        since_ts=since_ts,
-        until_ts=until_ts,
-        hosts=hosts,
-        host_nets=host_nets,
-        ports=ports,
-        protos=protos,
-        dns_ports=_normalize_ports_csv(args.dns_ports) or None,
-        tls_ports=_normalize_ports_csv(args.tls_ports) or None,
-        normalize_flows=bool(args.normalize_flows),
-    )
+    with _resolve_pcap_path(args.pcap) as pcap_path:
+        timeline = timeline_pcap(
+            pcap_path,
+            max_packets=int(args.max_packets),
+            top_n=int(args.top),
+            since_ts=since_ts,
+            until_ts=until_ts,
+            hosts=hosts,
+            host_nets=host_nets,
+            ports=ports,
+            protos=protos,
+            http_ports=_normalize_ports_csv(args.http_ports) or None,
+            dns_ports=_normalize_ports_csv(args.dns_ports) or None,
+            tls_ports=_normalize_ports_csv(args.tls_ports) or None,
+            normalize_flows=bool(args.normalize_flows),
+        )
     fmt = str(args.format) if args.format is not None else None
     if args.json:
         if fmt is not None and fmt != "json":

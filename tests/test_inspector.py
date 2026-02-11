@@ -528,6 +528,29 @@ def test_inspect_pcap_http_ports_filter(tmp_path: Path) -> None:
     assert http_lines == ["GET /ok HTTP/1.1"]
 
 
+def test_summarize_and_timeline_http_ports_filter(tmp_path: Path) -> None:
+    pkt_ok = (
+        IP(src="10.0.0.1", dst="93.184.216.34")
+        / TCP(sport=55555, dport=80, seq=1)
+        / Raw(load=b"GET /ok HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pkt_skip = (
+        IP(src="10.0.0.2", dst="93.184.216.34")
+        / TCP(sport=55556, dport=12345, seq=1)
+        / Raw(load=b"GET /skip HTTP/1.1\r\nHost: example.com\r\n\r\n")
+    )
+    pcap = tmp_path / "http-ports-summary-timeline.pcap"
+    wrpcap(str(pcap), [pkt_ok, pkt_skip])
+
+    summary = summarize_pcap(pcap, max_packets=0, top_n=10, http_ports={80})
+    assert summary["totals"]["http_requests"] == 1
+    assert summary["totals"]["http_ports"] == [80]
+
+    timeline = timeline_pcap(pcap, max_packets=0, top_n=10, http_ports={80})
+    assert sum(int(flow["http_events"]) for flow in timeline["flows"]) == 1
+    assert timeline["totals"]["http_ports"] == [80]
+
+
 def test_inspect_pcap_tls_ports_filter(tmp_path: Path) -> None:
     pkt = (
         IP(src="10.0.0.1", dst="93.184.216.34")
