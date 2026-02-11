@@ -1,5 +1,28 @@
 # PROJECT_MEMORY
 
+## Entry: 2026-02-11-cycle1-stdin-and-http-port-parity
+- Decision: Add `--pcap -` stdin ingestion for `inspect/summary/timeline` via safe temporary-file spooling, and add `--http-ports` parity to `summary` and `timeline`.
+- Why: Pipeline ingestion is a baseline CLI expectation in this category, and HTTP parse scoping needed cross-command consistency to reduce false positives in summaries/timelines.
+- Evidence:
+  - Code: `src/pcap_inspector/cli.py`, `src/pcap_inspector/inspector.py`, `src/pcap_inspector/schema.py`
+  - Tests: `tests/test_smoke.py` (stdin ingestion for inspect/summary/timeline), `tests/test_inspector.py` (`summary/timeline` http-port filter parity)
+  - Docs: `README.md`, `PROJECT.md`, `CHANGELOG.md`
+- Verification Evidence:
+  - `make check` (pass)
+  - Smoke (generated fixture): `cat "$PCAP" | .venv/bin/pcap-inspector inspect --pcap - --out - --flows-only` (pass; emitted only `type=flow`)
+  - Smoke: `.venv/bin/pcap-inspector summary --pcap "$PCAP" --format json --http-ports 80` (pass; `http_requests: 1`, `http_ports: [80]`)
+  - Smoke: `cat "$PCAP" | .venv/bin/pcap-inspector timeline --pcap - --top 10 --format json --http-ports 80` (pass; only one flow has `http_events: 1`)
+- Mistakes And Fixes:
+  - Root cause: Initial smoke harness attempted to read `PCAP` from environment before exporting it.
+  - Fix: Export `PCAP` before invoking the embedded Python fixture generator.
+  - Prevention rule: For shell-to-Python smoke scripts, export all required env vars explicitly at declaration time.
+- Commit: `b62dd79cd95a65c62a04ea30779f49002fa0be52`
+- Confidence: High
+- Trust Label: trusted
+- Follow-ups:
+  - Add `inspect --progress` telemetry (`--progress` + `--progress-every`) for long-running captures.
+  - Evaluate safe restricted `--bpf`/`--filter` subset with strict validation.
+
 ## Entry: 2026-02-09-cycle1-clean-cli-errors-and-flow-times
 - Decision: Silence Scapy runtime warnings by default; add clean CLI errors for unreadable PCAPs; add optional flow timestamps via `inspect --include-flow-times`.
 - Why: Keep CLI output clean for piping/grep, avoid traceback-on-user-error, and lay groundwork for future flow timeline features.
